@@ -108,11 +108,11 @@ impl App {
         }
     }
 
-    fn receive(&mut self) {
-        let Some(job) = &self.job else { return };
+    fn receive(&mut self) -> bool {
+        let Some(job) = &self.job else { return false };
         let result = match job.try_recv() {
             Ok(result) => result,
-            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Empty) => return false,
             Err(TryRecvError::Disconnected) => Err("A SMART-lekérdezés megszakadt.".into()),
         };
         self.job = None;
@@ -131,6 +131,7 @@ impl App {
                 self.status = devices::clean(&error.to_string());
             }
         }
+        true
     }
 
     fn scroll(&mut self, amount: isize, last: u16) {
@@ -236,15 +237,22 @@ pub fn run() -> Result<()> {
     let _guard = TerminalGuard;
     execute!(io::stdout(), EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+    let mut scroll = (1, 0, 0);
+    let mut redraw = true;
     loop {
-        app.receive();
-        let mut scroll = (1, 0, 0);
-        terminal.draw(|frame| scroll = draw(frame, &mut app))?;
+        if app.receive() || redraw {
+            terminal.draw(|frame| scroll = draw(frame, &mut app))?;
+            redraw = false;
+        }
         let (page, last, rightmost) = scroll;
         if app.job.is_some() && !event::poll(Duration::from_millis(100))? {
             continue;
         }
-        let Event::Key(key) = event::read()? else { continue };
+        let key = match event::read()? {
+            Event::Key(key) => key,
+            Event::Resize(_, _) => { redraw = true; continue }
+            _ => continue,
+        };
         if key.kind == KeyEventKind::Release {
             continue;
         }
@@ -252,6 +260,7 @@ pub fn run() -> Result<()> {
             || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)) {
             break;
         }
+        redraw = true;
         match key.code {
             KeyCode::Up if app.job.is_none() => app.navigate(-1),
             KeyCode::Down if app.job.is_none() => app.navigate(1),

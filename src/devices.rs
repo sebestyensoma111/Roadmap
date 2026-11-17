@@ -89,7 +89,7 @@ pub struct Report {
     pub disk: Option<Disk>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, serde::Serialize)]
 pub enum Condition {
     Passed,
     MediaWarnings,
@@ -134,9 +134,24 @@ pub fn read_smart_desktop(path: &str, device_type: Option<&str>) -> Result<Repor
 }
 
 #[cfg(feature = "desktop")]
-pub fn live_temperature(disk: &Disk, adapter: Option<&str>, allow_smart_fallback: bool) -> Option<String> {
+pub fn live_temperature(
+    disk: &Disk,
+    adapter: Option<&str>,
+    allow_smart_fallback: bool,
+    cached_sensor: &mut Option<std::path::PathBuf>,
+) -> Option<String> {
     let path = Path::new(&disk.path);
     let name = path.file_name()?;
+    let read_sensor = |sensor: &Path| {
+        let milli = fs::read_to_string(sensor).ok()?.trim().parse::<i32>().ok()?;
+        Some(format!("{:.0} °C", f64::from(milli) / 1000.0))
+    };
+    if let Some(sensor) = cached_sensor.take() {
+        if let Some(value) = read_sensor(&sensor) {
+            *cached_sensor = Some(sensor);
+            return Some(value);
+        }
+    }
     if let Ok(device) = fs::canonicalize(Path::new("/sys/class/block").join(name).join("device")) {
         for sensor in fs::read_dir("/sys/class/hwmon").into_iter().flatten().flatten() {
             let sensor = sensor.path();
@@ -147,10 +162,11 @@ pub fn live_temperature(disk: &Disk, adapter: Option<&str>, allow_smart_fallback
             if !matches!(driver.trim(), "nvme" | "drivetemp") {
                 continue;
             }
-            if let Some(milli) = fs::read_to_string(sensor.join("temp1_input"))
-                .ok().and_then(|value| value.trim().parse::<i32>().ok())
-            {
-                return Some(format!("{:.0} °C", f64::from(milli) / 1000.0));
+            if let Ok(input) = fs::canonicalize(sensor.join("temp1_input")) {
+                if let Some(value) = read_sensor(&input) {
+                    *cached_sensor = Some(input);
+                    return Some(value);
+                }
             }
         }
     }
@@ -249,16 +265,65 @@ fn host_amount(bytes: u128) -> String {
 }
 
 fn pci_vendor_name(id: u128) -> Option<String> {
-    let prefix = format!("{id:04x}  ");
-    let database = fs::read_to_string("/usr/share/hwdata/pci.ids")
-        .or_else(|_| fs::read_to_string("/usr/share/misc/pci.ids")).ok()?;
-    database.lines().find_map(|line| line.strip_prefix(&prefix).map(clean))
+    use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+    static VENDORS: OnceLock<Mutex<HashMap<u128, Option<String>>>> = OnceLock::new();
+    let mut vendors = VENDORS.get_or_init(Mutex::default).lock().ok()?;
+    vendors.entry(id).or_insert_with(|| {
+        let prefix = format!("{id:04x}  ");
+        let database = fs::read_to_string("/usr/share/hwdata/pci.ids")
+            .or_else(|_| fs::read_to_string("/usr/share/misc/pci.ids")).ok()?;
+        database.lines().find_map(|line| line.strip_prefix(&prefix).map(clean))
+    }).clone()
 }
 
 impl Report {
     #[cfg(feature = "desktop")]
     pub fn temperature(&self) -> Option<String> {
         temperature(&self.data)
+    }
+
+    #[cfg(feature = "desktop")]
+    pub fn diagnostics(&self) -> String {
+        let mut sections = Vec::new();
+        let mut current = Vec::new();
+        for line in self.data["smartctl"]["output"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            let heading = line.trim().to_ascii_lowercase();
+            let starts_log = [
+                "smart error log", "smart extended comprehensive error log", "smart self-test log",
+                "smart extended self-test log", "self-test log", "error information (nvme log",
+                "error counter log",
+            ].iter().any(|prefix| heading.starts_with(prefix));
+            let ends_log = [
+                "smart selective self-test", "selective self-test", "sct ", "device statistics",
+                "sata phy", "general purpose log", "pending defects log", "sct commands",
+                "non-medium error count", "background scan", "sas address", "solid state media",
+            ].iter().any(|prefix| heading.starts_with(prefix));
+            if starts_log || ends_log {
+                if !current.is_empty() {
+                    sections.push(current.join("\n").trim_end().to_string());
+                    current.clear();
+                }
+            }
+            if starts_log || !current.is_empty() {
+                current.push(clean(line));
+            }
+        }
+        if !current.is_empty() {
+            sections.push(current.join("\n").trim_end().to_string());
+        }
+        if sections.is_empty() {
+            for (key, label) in [
+                ("ata_smart_error_log", "ATA hibanapló"), ("ata_smart_self_test_log", "ATA öntesztnapló"),
+                ("nvme_error_information_log", "NVMe hibanapló"), ("nvme_self_test_log", "NVMe öntesztnapló"),
+                ("scsi_error_counter_log", "SCSI hibaszámlálók"), ("scsi_self_test_log", "SCSI öntesztnapló"),
+            ] {
+                if let Some(value) = self.data.get(key) {
+                    sections.push(format!("{label}\n{}", serde_json::to_string_pretty(value).unwrap_or_default()));
+                }
+            }
+        }
+        if sections.is_empty() { "A meghajtó jelentésében nincs elérhető hiba- vagy öntesztnapló.".into() }
+        else { sections.join("\n\n") }
     }
 
     fn ata_statistics(&self) -> impl Iterator<Item = &Value> {
@@ -475,6 +540,25 @@ mod tests {
         assert_eq!(host_amount(512_500_000_000), "512.50 GB");
         assert_eq!(host_amount(1_000_000_000_000), "1.000 TB");
         assert_eq!(host_amount(1_250_000_000_000), "1.250 TB");
+    }
+
+    #[cfg(feature = "desktop")]
+    #[test]
+    fn diagnostics_include_later_entries_and_stop_at_other_sections() {
+        let report = Report {
+            data: json!({"smartctl": {"output": [
+                "Serial Number: secret", "SMART Error Log Version: 1", "",
+                "Error 2 occurred", "", "Error 1 occurred", "",
+                "SMART Self-test log structure revision number 1", "No self-tests have been logged.",
+                "Device Statistics (GP Log 0x04)", "Power-on Hours"
+            ]}}),
+            code: 0, path: String::new(), disk: None,
+        };
+        let diagnostics = report.diagnostics();
+        assert!(diagnostics.contains("Error 1 occurred"));
+        assert!(diagnostics.contains("No self-tests have been logged."));
+        assert!(!diagnostics.contains("Power-on Hours"));
+        assert!(!diagnostics.contains("secret"));
     }
 
     fn health(data: Value) -> Health {

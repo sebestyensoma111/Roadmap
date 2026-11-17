@@ -38,7 +38,7 @@
         <property name="orientation">vertical</property>
         <child>
           <object class="GtkPaned">
-            <property name="position">275</property>
+            <property name="position">290</property>
             <property name="resize-start-child">false</property>
             <property name="vexpand">true</property>
             <property name="start-child">
@@ -164,6 +164,55 @@
                   </object>
                 </child>
                 <child>
+                  <object class="GtkBox" id="changes_card">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">6</property>
+                    <property name="visible">false</property>
+                    <style><class name="roadmap-card"/></style>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label">Változások</property>
+                        <property name="xalign">0</property>
+                        <style><class name="heading"/></style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="hscrollbar-policy">never</property>
+                        <property name="max-content-height">92</property>
+                        <property name="propagate-natural-height">true</property>
+                        <property name="child">
+                          <object class="GtkLabel" id="changes">
+                            <property name="xalign">0</property>
+                            <property name="wrap">true</property>
+                            <property name="selectable">true</property>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkButton" id="snapshot">
+                        <property name="label">Pillanatkép mentése</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="export">
+                        <property name="label">Jelentés mentése…</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkCheckButton" id="export_serial">
+                        <property name="label">Sorozatszám a jelentésben</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkNotebook" id="notebook">
                     <property name="vexpand">true</property>
                     <child>
@@ -183,6 +232,36 @@
                       </object>
                     </child>
                     <child type="tab"><object class="GtkLabel"><property name="label">Összefoglaló</property></object></child>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="hscrollbar-policy">never</property>
+                        <property name="child">
+                          <object class="GtkListBox" id="history_list">
+                            <property name="selection-mode">none</property>
+                            <property name="show-separators">true</property>
+                            <property name="margin-start">12</property>
+                            <property name="margin-end">12</property>
+                            <property name="margin-top">12</property>
+                            <property name="margin-bottom">12</property>
+                            <style><class name="boxed-list"/></style>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child type="tab"><object class="GtkLabel"><property name="label">Előzmények</property></object></child>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="child">
+                          <object class="GtkTextView" id="diagnostics">
+                            <property name="editable">false</property>
+                            <property name="monospace">true</property>
+                            <property name="left-margin">12</property>
+                            <property name="top-margin">12</property>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child type="tab"><object class="GtkLabel"><property name="label">Naplók</property></object></child>
                     <child>
                       <object class="GtkScrolledWindow">
                         <property name="child">

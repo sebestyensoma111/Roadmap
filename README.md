@@ -13,7 +13,11 @@ cargo build --release --locked
 
 Válassz meghajtót a bal oldali listában, majd kattints a **SMART lekérése** gombra. Az összefoglaló, a teljes szöveges jelentés és a JSON külön fülön érhető el. Ha a meghajtóhoz magasabb jogosultság kell, a rendszer a SMART-lekérdezéshez kér hitelesítést.
 
-A kiválasztott meghajtó hőfoka a neve alatt jelenik meg és öt másodpercenként frissül, amíg az ablak nyitva van. A Roadmap a Linux hőfokszenzorát vagy normál jogosultságú SMART-lekérdezést használ. Ha az élő érték nem érhető el, az utolsó ismert hőfokot külön megjelöli, amennyiben van ilyen.
+A kiválasztott meghajtó hőfoka a neve alatt jelenik meg és öt másodpercenként frissül, amíg az ablak nyitva van. A Roadmap a Linux hőfokszenzorát vagy normál jogosultságú SMART-lekérdezést használ. Ha az élő érték nem érhető el, az utolsó ismert hőfokot külön megjelöli, és 30 másodperc múlva próbálkozik újra. A meghajtólistában a legutóbbi SMART-mérés állapota és időpontja is látható.
+
+A **Pillanatkép mentése** gomb meghajtónként menti a lekért fő adatokat a `$XDG_DATA_HOME/roadmap/history` mappába. Az alapértelmezett hely a `~/.local/share/roadmap/history`. A következő SMART-lekéréskor az előző mentéshez képest látható, mely értékek változtak. A növekvő hibaszámlálók külön jelzést kapnak, ha mindkét mérés közli a számlálót. Az **Előzmények** fülön az utolsó 50 mentés látható.
+
+A **Naplók** fül a meghajtó jelentésében szereplő hiba- és öntesztnaplókat jeleníti meg. A **Jelentés mentése…** szövegfájlt készít a választott helyen. Az exportban a sorozatszám alapból rejtett, a meglévő fájlok felülírása helyett új fájlnevet kér.
 
 A meghajtó neve alatt színes jelző mutatja a SMART-kondíciót. A zöld megfelelő állapotot, a sárga adathordozó-hibákat vagy legfeljebb 10% hátralévő élettartamot, a piros kritikus SMART-jelzést, a szürke hiányzó állapotadatot jelent. A százaléksáv az SSD által közölt kopásadatból számolt, becsült hátralévő névleges élettartamot mutatja. HDD-knél és kopásadat nélküli SSD-knél a kondíciójelző mellé a százalék hiánya kerül.
 

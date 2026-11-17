@@ -1,7 +1,9 @@
-use std::ffi::{c_char, c_int, c_uint, c_void};
+use std::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 
 pub type Object = *mut c_void;
 pub type Callback = unsafe extern "C" fn();
+pub const FILE_CHOOSER_SAVE: c_int = 1;
+pub const RESPONSE_ACCEPT: c_int = -3;
 
 #[link(name = "libgtk-4.so.1", kind = "dylib", modifiers = "+verbatim")]
 extern "C" {
@@ -14,6 +16,7 @@ extern "C" {
     pub fn gtk_css_provider_load_from_data(provider: Object, data: *const c_char, length: isize);
     pub fn gtk_style_context_add_provider_for_display(display: Object, provider: Object, priority: c_uint);
     pub fn gtk_window_present(window: Object);
+    pub fn gtk_window_destroy(window: Object);
     pub fn gtk_window_set_icon_name(window: Object, name: *const c_char);
     pub fn gtk_image_set_from_paintable(image: Object, paintable: Object);
     pub fn gtk_widget_get_first_child(widget: Object) -> Object;
@@ -22,6 +25,7 @@ extern "C" {
     pub fn gtk_widget_set_visible(widget: Object, visible: c_int);
     pub fn gtk_widget_set_hexpand(widget: Object, expand: c_int);
     pub fn gtk_widget_add_css_class(widget: Object, class: *const c_char);
+    pub fn gtk_widget_remove_css_class(widget: Object, class: *const c_char);
     pub fn gtk_widget_set_margin_start(widget: Object, margin: c_int);
     pub fn gtk_widget_set_margin_end(widget: Object, margin: c_int);
     pub fn gtk_widget_set_margin_top(widget: Object, margin: c_int);
@@ -45,11 +49,25 @@ extern "C" {
     pub fn gtk_combo_box_set_active(combo: Object, index: c_int);
     pub fn gtk_combo_box_get_active(combo: Object) -> c_int;
     pub fn gtk_notebook_set_current_page(notebook: Object, index: c_int);
+    pub fn gtk_notebook_get_current_page(notebook: Object) -> c_int;
+    pub fn gtk_check_button_get_active(button: Object) -> c_int;
+    pub fn gtk_file_chooser_native_new(title: *const c_char, parent: Object, action: c_int,
+        accept: *const c_char, cancel: *const c_char) -> Object;
+    pub fn gtk_file_chooser_set_current_name(dialog: Object, name: *const c_char);
+    pub fn gtk_file_chooser_get_file(dialog: Object) -> Object;
+    pub fn gtk_native_dialog_set_modal(dialog: Object, modal: c_int);
+    pub fn gtk_native_dialog_show(dialog: Object);
+    pub fn gtk_native_dialog_destroy(dialog: Object);
     pub fn gtk_progress_bar_set_fraction(bar: Object, fraction: f64);
     pub fn gtk_text_view_get_buffer(view: Object) -> Object;
     pub fn gtk_text_buffer_set_text(buffer: Object, text: *const c_char, len: c_int);
     pub fn gtk_box_new(orientation: c_int, spacing: c_int) -> Object;
     pub fn gtk_box_append(container: Object, child: Object);
+}
+
+#[link(name = "libgio-2.0.so.0", kind = "dylib", modifiers = "+verbatim")]
+extern "C" {
+    pub fn g_file_get_path(file: Object) -> *mut c_char;
 }
 
 #[link(name = "libgobject-2.0.so.0", kind = "dylib", modifiers = "+verbatim")]
@@ -62,7 +80,8 @@ extern "C" {
         data: Object,
         destroy: Option<unsafe extern "C" fn(Object, Object)>,
         flags: c_uint,
-    ) -> std::ffi::c_ulong;
+    ) -> c_ulong;
+    pub fn g_signal_handler_disconnect(object: Object, handler_id: c_ulong);
 }
 
 #[link(name = "libglib-2.0.so.0", kind = "dylib", modifiers = "+verbatim")]
@@ -71,6 +90,10 @@ extern "C" {
     pub fn g_set_prgname(name: *const c_char);
     pub fn g_bytes_new_static(data: *const c_void, size: usize) -> Object;
     pub fn g_bytes_unref(bytes: Object);
+    pub fn g_date_time_new_from_unix_local(timestamp: i64) -> Object;
+    pub fn g_date_time_format(date: Object, format: *const c_char) -> *mut c_char;
+    pub fn g_date_time_unref(date: Object);
+    pub fn g_free(pointer: Object);
     pub fn g_main_loop_new(context: Object, running: c_int) -> Object;
     pub fn g_main_loop_run(main_loop: Object);
     pub fn g_main_loop_quit(main_loop: Object);
