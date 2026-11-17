@@ -1,17 +1,25 @@
 mod devices;
 mod ui;
+#[cfg(feature = "desktop")]
+mod desktop;
 
 use devices::Result;
 use std::{env, process::ExitCode};
 
 fn usage() {
     println!("Roadmap · Linux SMART-lekérdezés\n\n  roadmap\n  roadmap list\n  roadmap smart ESZKÖZ [--full | --json] [--type USB-TÍPUS]");
+    #[cfg(feature = "desktop")]
+    println!("  roadmap --gui\n  roadmap --install-desktop");
 }
 
 fn run() -> Result<u8> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         None => ui::run()?,
+        #[cfg(feature = "desktop")]
+        Some("--gui") if args.len() == 1 => desktop::run()?,
+        #[cfg(feature = "desktop")]
+        Some("--install-desktop") if args.len() == 1 => desktop::install()?,
         Some("--help" | "-h") => usage(),
         Some("list") if args.len() == 1 => {
             for disk in devices::disks()? {

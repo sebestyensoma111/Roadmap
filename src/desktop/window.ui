@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <object class="GtkWindow" id="window">
+    <property name="title">Roadmap</property>
+    <property name="default-width">1080</property>
+    <property name="default-height">720</property>
+    <child type="titlebar">
+      <object class="GtkHeaderBar">
+        <property name="title-widget">
+          <object class="GtkLabel">
+            <property name="label">Roadmap</property>
+            <style><class name="title"/></style>
+          </object>
+        </property>
+        <child type="start">
+          <object class="GtkButton" id="refresh">
+            <property name="icon-name">view-refresh-symbolic</property>
+            <property name="tooltip-text">Meghajtók frissítése</property>
+          </object>
+        </child>
+        <child type="end">
+          <object class="GtkButton" id="read">
+            <property name="label">SMART lekérése</property>
+            <style><class name="suggested-action"/></style>
+          </object>
+        </child>
+      </object>
+    </child>
+    <property name="child">
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <child>
+          <object class="GtkPaned">
+            <property name="position">275</property>
+            <property name="resize-start-child">false</property>
+            <property name="vexpand">true</property>
+            <property name="start-child">
+              <object class="GtkBox" id="sidebar">
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin-start">16</property>
+                <property name="margin-end">16</property>
+                <property name="margin-top">20</property>
+                <property name="margin-bottom">16</property>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">Meghajtók</property>
+                    <property name="xalign">0</property>
+                    <style><class name="title-3"/></style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkScrolledWindow">
+                    <property name="vexpand">true</property>
+                    <property name="hscrollbar-policy">never</property>
+                    <property name="child">
+                      <object class="GtkListBox" id="disks">
+                        <property name="selection-mode">browse</property>
+                        <style><class name="boxed-list"/></style>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">USB-adapter típusa</property>
+                    <property name="xalign">0</property>
+                    <style><class name="dim-label"/></style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="adapter"/>
+                </child>
+              </object>
+            </property>
+            <property name="end-child">
+              <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="spacing">12</property>
+                <property name="margin-start">20</property>
+                <property name="margin-end">20</property>
+                <property name="margin-top">20</property>
+                <property name="margin-bottom">16</property>
+                <child>
+                  <object class="GtkLabel" id="heading">
+                    <property name="xalign">0</property>
+                    <property name="wrap">true</property>
+                    <property name="selectable">true</property>
+                    <style><class name="title-2"/></style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="subtitle">
+                    <property name="xalign">0</property>
+                    <property name="wrap">true</property>
+                    <property name="selectable">true</property>
+                    <style><class name="dim-label"/></style>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox" id="health_panel">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">5</property>
+                    <property name="visible">false</property>
+                    <child>
+                      <object class="GtkLabel" id="health_condition">
+                        <property name="xalign">0</property>
+                        <property name="wrap">true</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="health_endurance">
+                        <property name="xalign">0</property>
+                        <property name="wrap">true</property>
+                        <style><class name="dim-label"/></style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkProgressBar" id="health_bar">
+                        <property name="halign">start</property>
+                        <property name="width-request">240</property>
+                        <style><class name="health-bar"/></style>
+                        <accessibility>
+                          <property name="label">Becsült hátralévő élettartam</property>
+                        </accessibility>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="written">
+                        <property name="margin-top">4</property>
+                        <property name="xalign">0</property>
+                        <property name="wrap">true</property>
+                        <property name="selectable">true</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="read_total">
+                        <property name="xalign">0</property>
+                        <property name="wrap">true</property>
+                        <property name="selectable">true</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="power_on_time">
+                        <property name="xalign">0</property>
+                        <property name="wrap">true</property>
+                        <property name="selectable">true</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkNotebook" id="notebook">
+                    <property name="vexpand">true</property>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="hscrollbar-policy">never</property>
+                        <property name="child">
+                          <object class="GtkListBox" id="summary">
+                            <property name="selection-mode">none</property>
+                            <property name="show-separators">true</property>
+                            <property name="margin-start">12</property>
+                            <property name="margin-end">12</property>
+                            <property name="margin-top">12</property>
+                            <property name="margin-bottom">12</property>
+                            <style><class name="boxed-list"/></style>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child type="tab"><object class="GtkLabel"><property name="label">Összefoglaló</property></object></child>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="child">
+                          <object class="GtkTextView" id="full">
+                            <property name="editable">false</property>
+                            <property name="monospace">true</property>
+                            <property name="left-margin">12</property>
+                            <property name="top-margin">12</property>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child type="tab"><object class="GtkLabel"><property name="label">Teljes jelentés</property></object></child>
+                    <child>
+                      <object class="GtkScrolledWindow">
+                        <property name="child">
+                          <object class="GtkTextView" id="json">
+                            <property name="editable">false</property>
+                            <property name="monospace">true</property>
+                            <property name="left-margin">12</property>
+                            <property name="top-margin">12</property>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child type="tab"><object class="GtkLabel"><property name="label">JSON</property></object></child>
+                  </object>
+                </child>
+              </object>
+            </property>
+          </object>
+        </child>
+        <child><object class="GtkSeparator"/></child>
+        <child>
+          <object class="GtkBox">
+            <property name="spacing">8</property>
+            <property name="margin-start">16</property>
+            <property name="margin-end">16</property>
+            <property name="margin-top">8</property>
+            <property name="margin-bottom">8</property>
+            <child>
+              <object class="GtkSpinner" id="spinner">
+                <property name="visible">false</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel" id="status">
+                <property name="xalign">0</property>
+                <property name="wrap">true</property>
+                <property name="selectable">true</property>
+                <style><class name="dim-label"/></style>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </property>
+  </object>
+</interface>

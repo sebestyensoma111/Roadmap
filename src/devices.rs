@@ -50,11 +50,15 @@ pub fn clean(input: &str) -> String {
 }
 
 impl Disk {
+    pub fn capacity_label(&self) -> String {
+        format!("{:.2} GiB", self.size as f64 / 1073741824.0)
+    }
+
     pub fn label(&self) -> String {
         format!(
-            "{}  ·  {:.2} GiB  ·  {}  ·  {}",
+            "{}  ·  {}  ·  {}  ·  {}",
             self.path,
-            self.size as f64 / 1073741824.0,
+            self.capacity_label(),
             self.tran.as_deref().unwrap_or("–"),
             clean(self.model.as_deref().unwrap_or("ismeretlen modell").trim()),
         )
@@ -73,6 +77,9 @@ impl Disk {
 }
 
 pub const USB_TYPES: &[&str] = &["sat", "sat,12", "sat,16", "scsi", "sntjmicron", "sntasmedia", "sntrealtek"];
+pub const POWER_ON_TIME: &str = "Üzemidő";
+pub const HOST_WRITTEN: &str = "Összes írt adat (host)";
+pub const HOST_READ: &str = "Összes olvasott adat (host)";
 
 pub struct Report {
     pub data: Value,
@@ -81,7 +88,51 @@ pub struct Report {
     pub disk: Option<Disk>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Condition {
+    Passed,
+    MediaWarnings,
+    LowEndurance,
+    Critical,
+    Unavailable,
+}
+
+impl Condition {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Passed => "Jó SMART-állapot",
+            Self::MediaWarnings => "Figyelmeztetés · adathordozó-hibák",
+            Self::LowEndurance => "Figyelmeztetés · alacsony hátralévő élettartam",
+            Self::Critical => "Kritikus SMART-jelzés",
+            Self::Unavailable => "SMART-állapot nem érhető el",
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Health {
+    pub condition: Condition,
+    pub remaining: Option<u8>,
+}
+
 pub fn read_smart(path: &str, device_type: Option<&str>) -> Result<Report> {
+    query_smart(path, device_type, false)
+}
+
+#[cfg(feature = "desktop")]
+pub fn read_smart_desktop(path: &str, device_type: Option<&str>) -> Result<Report> {
+    let report = read_smart(path, device_type)?;
+    let permission_denied = report.code & 2 != 0 && report.data["smartctl"]["messages"]
+        .as_array().into_iter().flatten().any(|message| {
+            message["string"].as_str().is_some_and(|text| text.contains("Permission denied"))
+        });
+    if permission_denied {
+        return query_smart(path, device_type, true);
+    }
+    Ok(report)
+}
+
+fn query_smart(path: &str, device_type: Option<&str>, elevation: bool) -> Result<Report> {
     let target = fs::canonicalize(path)?;
     let file_type = fs::metadata(&target)?.file_type();
     let disk = disks()?.into_iter().find(|disk| target.as_path() == Path::new(&disk.path));
@@ -91,7 +142,16 @@ pub fn read_smart(path: &str, device_type: Option<&str>) -> Result<Report> {
         return Err("Teljes meghajtót vagy NVMe-vezérlőt válassz a /dev alól.".into());
     }
     let mut command = Command::new("timeout");
-    command.args(["--kill-after=2s", "30s", "smartctl", "--xall", "--json=ov"]);
+    command.env("LC_ALL", "C");
+    if elevation {
+        let smartctl = ["/usr/sbin/smartctl", "/usr/bin/smartctl"]
+            .into_iter().find(|path| Path::new(path).is_file())
+            .ok_or("A smartctl rendszerparancs nem található.")?;
+        command.args(["--kill-after=2s", "120s", "pkexec", "--disable-internal-agent", smartctl]);
+    } else {
+        command.args(["--kill-after=2s", "30s", "smartctl"]);
+    }
+    command.args(["--xall", "--json=ov"]);
     if let Some(device_type) = device_type {
         if !USB_TYPES.contains(&device_type) {
             return Err("Ismeretlen USB-adaptertípus.".into());
@@ -103,7 +163,11 @@ pub fn read_smart(path: &str, device_type: Option<&str>) -> Result<Report> {
     let data = serde_json::from_slice(&output.stdout).map_err(|error| -> Box<dyn std::error::Error + Send + Sync> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if matches!(code, 124 | 137) {
-            "A SMART-lekérdezés túllépte a 30 másodperces időkorlátot.".into()
+            "A SMART-lekérdezés túllépte az időkorlátot.".into()
+        } else if elevation && code == 126 {
+            "A hitelesítést megszakították.".into()
+        } else if elevation && code == 127 {
+            format!("A grafikus hitelesítés sikertelen. {}", clean(stderr.trim())).into()
         } else if stderr.trim().is_empty() {
             format!("A smartctl nem adott érvényes JSON-jelentést: {error}").into()
         } else {
@@ -133,6 +197,14 @@ fn amount(bytes: u128) -> String {
     format!("{bytes} B  ·  {:.2} GB  ·  {:.3} TB", bytes as f64 / 1e9, bytes as f64 / 1e12)
 }
 
+fn host_amount(bytes: u128) -> String {
+    if bytes < 1_000_000_000_000 {
+        format!("{:.2} GB", bytes as f64 / 1e9)
+    } else {
+        format!("{:.3} TB", bytes as f64 / 1e12)
+    }
+}
+
 fn pci_vendor_name(id: u128) -> Option<String> {
     let prefix = format!("{id:04x}  ");
     let database = fs::read_to_string("/usr/share/hwdata/pci.ids")
@@ -141,6 +213,61 @@ fn pci_vendor_name(id: u128) -> Option<String> {
 }
 
 impl Report {
+    fn ata_statistics(&self) -> impl Iterator<Item = &Value> {
+        self.data["ata_device_statistics"]["pages"].as_array().into_iter().flatten()
+            .filter_map(|page| page["table"].as_array()).flatten()
+            .filter(|field| field["flags"]["valid"].as_bool() != Some(false))
+    }
+
+    pub fn health(&self) -> Health {
+        let nvme = &self.data["nvme_smart_health_information_log"];
+        let attributes = self.data["ata_smart_attributes"]["table"].as_array();
+        let ata_value = |names: &[&str], field: &str| {
+            attributes.into_iter().flatten()
+                .filter(|attribute| attribute["name"].as_str().is_some_and(|name| names.contains(&name)))
+                .find_map(|attribute| attribute.pointer(field).and_then(number))
+        };
+        let used = number(&nvme["percentage_used"])
+            .or_else(|| self.ata_statistics()
+                .find(|field| field["name"].as_str() == Some("Percentage Used Endurance Indicator"))
+                .and_then(|field| number(&field["value"])))
+            .or_else(|| ata_value(&["Percent_Lifetime_Used"], "/raw/value"));
+        let remaining = used.filter(|used| *used <= 255)
+            .map(|used| 100_u8.saturating_sub(used as u8))
+            .or_else(|| {
+                ata_value(&["Percent_Lifetime_Remain", "SSD_Life_Left", "Remaining_Lifetime_Perc"], "/value")
+                    .filter(|value| *value <= 100).map(|value| value as u8)
+            });
+        let has_count = |value: &Value| number(value).is_some_and(|count| count > 0);
+        let media_warning = has_count(&nvme["media_errors"])
+            || has_count(&self.data["ata_pending_defects_log"]["count"])
+            || attributes.into_iter().flatten().any(|attribute| {
+                matches!(attribute["name"].as_str(), Some("Reallocated_Sector_Ct"
+                    | "Current_Pending_Sector" | "Offline_Uncorrectable"))
+                    && has_count(&attribute["raw"]["value"])
+            })
+            || self.ata_statistics().any(|field| {
+                matches!(field["name"].as_str(), Some("Number of Reallocated Logical Sectors"
+                    | "Number of Realloc. Candidate Logical Sectors" | "Number of Reported Uncorrectable Errors"))
+                    && field["flags"]["normalized"].as_bool() != Some(true)
+                    && has_count(&field["value"])
+            });
+        let passed = self.data["smart_status"]["passed"].as_bool();
+        let critical = &nvme["critical_warning"];
+        let condition = if passed == Some(false) || has_count(critical) || has_count(&critical["value"]) {
+            Condition::Critical
+        } else if media_warning {
+            Condition::MediaWarnings
+        } else if remaining.is_some_and(|value| value <= 10) {
+            Condition::LowEndurance
+        } else if passed == Some(true) {
+            Condition::Passed
+        } else {
+            Condition::Unavailable
+        };
+        Health { condition, remaining }
+    }
+
     pub fn json(&self) -> String {
         serde_json::to_string_pretty(&self.data).unwrap_or_default()
     }
@@ -158,13 +285,10 @@ impl Report {
         let nvme = &data["nvme_smart_health_information_log"];
         let disk = self.disk.as_ref();
         let attributes = data["ata_smart_attributes"]["table"].as_array();
-        let stats = data["ata_device_statistics"]["pages"].as_array();
         let null = Value::Null;
         let statistic = |name: &str| -> &Value {
-            stats.into_iter().flatten()
-                .filter_map(|page| page["table"].as_array()).flatten()
+            self.ata_statistics()
                 .find(|field| field["name"].as_str() == Some(name)
-                    && field["flags"]["valid"].as_bool() != Some(false)
                     && field["flags"]["normalized"].as_bool() != Some(true))
                 .map(|field| &field["value"]).unwrap_or(&null)
         };
@@ -194,7 +318,7 @@ impl Report {
                             })
                         })
                 })
-                .map(amount)
+                .map(host_amount)
         };
         let pci_id = number(&data["nvme_pci_vendor"]["id"]);
         let vendor = text(&data["vendor"])
@@ -228,7 +352,7 @@ impl Report {
             ("SMART állapot", data["smart_status"]["passed"].as_bool()
                 .map(|passed| if passed { "Megfelelt".into() } else { "Hibát jelez".into() })),
             ("Hőmérséklet", temperature.map(|value| format!("{value} °C"))),
-            ("Üzemidő", hours.map(|value| format!("{value} óra"))),
+            (POWER_ON_TIME, hours.map(|value| format!("{value} óra"))),
             ("Bekapcsolási ciklusok", text(&data["power_cycle_count"])
                 .or_else(|| text(&nvme["power_cycles"]))
                 .or_else(|| text(statistic("Lifetime Power-On Resets")))
@@ -239,8 +363,8 @@ impl Report {
                 .or_else(|| raw("Unsafe_Shutdown_Count")).or_else(|| raw("Unexpected_Power_Loss"))),
             ("Vészparkolások (ATA)", text(statistic("Number of High Priority Unload Events"))
                 .or_else(|| raw("Power-Off_Retract_Count"))),
-            ("Összes írt adat (host)", written),
-            ("Összes olvasott adat (host)", host_bytes("read", "Logical Sectors Read", "Reads")),
+            (HOST_WRITTEN, written),
+            (HOST_READ, host_bytes("read", "Logical Sectors Read", "Reads")),
             ("Írási parancsok", text(&nvme["host_writes"])
                 .or_else(|| text(statistic("Number of Write Commands")))),
             ("Olvasási parancsok", text(&nvme["host_reads"])
@@ -272,9 +396,16 @@ impl Report {
     }
 
     pub fn summary(&self) -> String {
-        let mut lines: Vec<_> = self.rows().into_iter()
-            .map(|(label, value)| format!("{label:36} {}", value.as_deref().unwrap_or("–")))
-            .collect();
+        let health = self.health();
+        let remaining = health.remaining.map(|value| format!("{value}%"))
+            .unwrap_or_else(|| "Nem érhető el".into());
+        let mut lines = vec![
+            format!("{:36} {}", "Kondíció", health.condition.label()),
+            format!("{:36} {remaining}", "Becsült hátralévő élettartam"),
+            String::new(),
+        ];
+        lines.extend(self.rows().into_iter()
+            .map(|(label, value)| format!("{label:36} {}", value.as_deref().unwrap_or("–"))));
         if self.code != 0 {
             lines.push(format!("\nSMART állapotkód: {}", self.code));
         }
@@ -284,5 +415,66 @@ impl Report {
             }
         }
         lines.join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn host_totals_switch_to_terabytes_at_one_terabyte() {
+        assert_eq!(host_amount(512_500_000_000), "512.50 GB");
+        assert_eq!(host_amount(1_000_000_000_000), "1.000 TB");
+        assert_eq!(host_amount(1_250_000_000_000), "1.250 TB");
+    }
+
+    fn health(data: Value) -> Health {
+        Report { data, code: 0, path: String::new(), disk: None }.health()
+    }
+
+    #[test]
+    fn nvme_wear_is_inverted_and_critical_status_takes_precedence() {
+        let report = |used, warning| json!({
+            "smart_status": { "passed": true },
+            "nvme_smart_health_information_log": {
+                "percentage_used": used,
+                "critical_warning": warning
+            }
+        });
+        assert_eq!(health(report(8, 0)), Health { condition: Condition::Passed, remaining: Some(92) });
+        assert_eq!(health(report(110, 0)), Health { condition: Condition::LowEndurance, remaining: Some(0) });
+        assert_eq!(health(report(8, 1)), Health { condition: Condition::Critical, remaining: Some(92) });
+    }
+
+    #[test]
+    fn sata_wear_prefers_standard_statistic_over_vendor_attribute() {
+        let report = |valid| json!({
+            "smart_status": { "passed": true },
+            "ata_device_statistics": { "pages": [{ "table": [{
+                "name": "Percentage Used Endurance Indicator",
+                "value": 15,
+                "flags": { "valid": valid, "normalized": true }
+            }]}] },
+            "ata_smart_attributes": { "table": [{
+                "name": "Percent_Lifetime_Remain", "value": 81, "raw": { "value": 19 }
+            }] }
+        });
+        assert_eq!(health(report(true)).remaining, Some(85));
+        assert_eq!(health(report(false)).remaining, Some(81));
+    }
+
+    #[test]
+    fn hdd_reports_sector_warnings_without_fabricating_a_percentage() {
+        let disk = health(json!({
+            "smart_status": { "passed": true },
+            "ata_smart_attributes": { "table": [
+                { "name": "Reallocated_Sector_Ct", "value": 100, "raw": { "value": 0 } },
+                { "name": "Current_Pending_Sector", "value": 100, "raw": { "value": 2 } }
+            ] }
+        }));
+        assert_eq!(disk, Health { condition: Condition::MediaWarnings, remaining: None });
+        assert_eq!(health(json!({})), Health { condition: Condition::Unavailable, remaining: None });
     }
 }
