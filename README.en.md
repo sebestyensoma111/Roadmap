@@ -1,0 +1,81 @@
+# Roadmap
+
+[Magyar](README.md) · **English**
+
+Roadmap is a Rust application for checking HDDs and SSDs on Linux. Its desktop dashboard brings together drive condition, temperature, power-on hours, and total data written. It also provides a terminal interface and commands for scripts.
+
+## Quick start
+
+Building requires Rust and Cargo 1.75 or later. The desktop interface requires GTK 4.6 or later. On Ubuntu 24.04, install the runtime dependencies and launch the desktop app as follows.
+
+```bash
+sudo apt install util-linux coreutils smartmontools libgtk-4-1 pkexec
+cargo build --release --locked
+./target/release/roadmap --gui
+```
+
+Launch the window as your regular user. Roadmap requests administrator authentication for the SMART query when needed. The desktop UI is currently in Hungarian. To add a launcher to your application menu, run the command below. The launcher points to the binary at its current location.
+
+```bash
+./target/release/roadmap --install-desktop
+```
+
+## Desktop interface
+
+1. Select a drive in the sidebar and click **SMART lekérése** (Read SMART).
+2. The summary shows the drive condition and explains any warning. The **Állapot** (Health) percentage appears when the drive reports endurance data. It represents the estimated remaining rated endurance calculated from that data.
+3. **Naplók** (Logs) shows the error and self-test logs reported by the drive. The full SMART output is available under **Teljes jelentés** (Full report) and **JSON**.
+
+The selected drive's live temperature updates every five seconds while the window is open. If live reading fails, Roadmap marks the previous value as last known when one is available and retries after 30 seconds. The sidebar also shows the condition and time of the last available SMART measurement.
+
+The condition indicator is green for good condition, yellow for media errors or remaining rated endurance at 10% or less, red for a critical SMART warning, and gray when condition data is unavailable. SMART queries only read diagnostic data from the drive.
+
+### History and health chart
+
+After **SMART lekérése**, Roadmap automatically saves the measurement when it can identify the drive. History lives in `~/.local/share/roadmap/history` by default, or `$XDG_DATA_HOME/roadmap/history` when `XDG_DATA_HOME` is set.
+
+**Előzmények** (History) uses the most recent 50 measurements. The chart appears once two measurements have been saved. When at least two measurements include an endurance percentage, the **Állapot** chart plots that percentage. Otherwise, the chart tracks SMART condition. An orange dot marks deterioration compared with the previous measurement. Hover over a point to see when it was recorded. Two measurements can be compared side by side below the chart. The comparison shows differences by default. Select **Minden érték** (All values) to see the rest of the available fields.
+
+### Measurement sheet and transfer between computers
+
+- **Mérési lap mentése…** (Save measurement sheet) creates a compact PNG of the key readings. The serial number is hidden by default. Select **Sorozatszám feltüntetése** (Include serial number) to add it to the image.
+- **Aktuális mérés exportálása…** (Export current measurement) creates a portable JSON file. On another computer, read SMART data from the same drive, then use **Előzmények → Mérés importálása…** (History → Import measurement). Roadmap checks the serial number and capacity to match the drive. The JSON includes the serial number for this purpose.
+
+## Terminal usage
+
+```bash
+cargo build --release --locked --no-default-features
+./target/release/roadmap
+```
+
+The terminal build can run without the desktop dependencies. If the drive requires elevated privileges for SMART access, run the terminal app or the `smart` command with `sudo`.
+
+| Key | Action |
+| --- | --- |
+| ↑ / ↓ | Select a drive |
+| Enter | Read SMART |
+| 1 / 2 / 3 | Summary / full report / JSON |
+| R / U | Refresh the drive list / change the USB adapter type |
+| Q or Esc | Quit |
+
+```bash
+./target/release/roadmap list
+sudo ./target/release/roadmap smart /dev/nvme0n1
+sudo ./target/release/roadmap smart /dev/nvme0n1 --json
+sudo ./target/release/roadmap smart /dev/sdX --type sat --full
+```
+
+Replace `/dev/sdX` in the last example with your drive's device path. Use `--type sat` with a USB adapter that supports SAT passthrough. When a valid or partial report is available, `smart` prints the available data and returns the `smartctl` status code.
+
+The summary includes available model, firmware, and capacity details as well as data written and read, power-on hours, power cycles, and error counters. A dash marks unavailable values. ATA write counters with unknown units appear as raw values.
+
+## Tests and CI
+
+The tests use sample SMART reports and can run without a test drive or administrator privileges.
+
+```bash
+cargo test --locked --all-targets
+cargo test --locked --all-targets --no-default-features
+```
+
+The [GitHub Actions workflow](.github/workflows/ci.yml) is configured for pushes and pull requests. It tests both the desktop and terminal configurations and builds the release binary on Rust 1.75.0 and current stable Rust.
