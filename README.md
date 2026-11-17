@@ -4,7 +4,7 @@ Rustban írt Linuxos alkalmazás meghajtók és partíciók listázásához, val
 
 ## Grafikus felület
 
-Ubuntu 24.04 alatt a grafikus változathoz `libgtk-4-1` és a szükség szerinti hitelesítéshez `pkexec` kell. Indítsd a programot a saját felhasználóddal.
+Ubuntu 24.04 alatt a grafikus változathoz `libgtk-4-1` (GTK 4.6 vagy újabb) és a szükség szerinti hitelesítéshez `pkexec` kell. Indítsd a programot a saját felhasználóddal.
 
 ```bash
 cargo build --release --locked
@@ -13,9 +13,11 @@ cargo build --release --locked
 
 Válassz meghajtót a bal oldali listában, majd kattints a **SMART lekérése** gombra. Az összefoglaló, a teljes szöveges jelentés és a JSON külön fülön érhető el. Ha a meghajtóhoz magasabb jogosultság kell, a rendszer a SMART-lekérdezéshez kér hitelesítést.
 
+A kiválasztott meghajtó hőfoka a neve alatt jelenik meg és öt másodpercenként frissül, amíg az ablak nyitva van. A Roadmap a Linux hőfokszenzorát vagy normál jogosultságú SMART-lekérdezést használ. Ha az élő érték nem érhető el, az utolsó ismert hőfokot külön megjelöli, amennyiben van ilyen.
+
 A meghajtó neve alatt színes jelző mutatja a SMART-kondíciót. A zöld megfelelő állapotot, a sárga adathordozó-hibákat vagy legfeljebb 10% hátralévő élettartamot, a piros kritikus SMART-jelzést, a szürke hiányzó állapotadatot jelent. A százaléksáv az SSD által közölt kopásadatból számolt, becsült hátralévő névleges élettartamot mutatja. HDD-knél és kopásadat nélküli SSD-knél a kondíciójelző mellé a százalék hiánya kerül.
 
-Az alkalmazásmenüben való megjelenéshez egyszer futtasd az alábbi parancsot. A menüpont a lefordított program jelenlegi elérési útjára mutat.
+Az alkalmazásmenü-bejegyzés és a Roadmap ikon telepítéséhez futtasd az alábbi parancsot. A menüpont a lefordított program jelenlegi elérési útjára mutat.
 
 ```bash
 ./target/release/roadmap --install-desktop

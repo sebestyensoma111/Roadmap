@@ -80,6 +80,7 @@ pub const USB_TYPES: &[&str] = &["sat", "sat,12", "sat,16", "scsi", "sntjmicron"
 pub const POWER_ON_TIME: &str = "Üzemidő";
 pub const HOST_WRITTEN: &str = "Összes írt adat (host)";
 pub const HOST_READ: &str = "Összes olvasott adat (host)";
+pub const TEMPERATURE: &str = "Hőmérséklet";
 
 pub struct Report {
     pub data: Value,
@@ -130,6 +131,48 @@ pub fn read_smart_desktop(path: &str, device_type: Option<&str>) -> Result<Repor
         return query_smart(path, device_type, true);
     }
     Ok(report)
+}
+
+#[cfg(feature = "desktop")]
+pub fn live_temperature(disk: &Disk, adapter: Option<&str>, allow_smart_fallback: bool) -> Option<String> {
+    let path = Path::new(&disk.path);
+    let name = path.file_name()?;
+    if let Ok(device) = fs::canonicalize(Path::new("/sys/class/block").join(name).join("device")) {
+        for sensor in fs::read_dir("/sys/class/hwmon").into_iter().flatten().flatten() {
+            let sensor = sensor.path();
+            if fs::canonicalize(sensor.join("device")).ok().as_ref() != Some(&device) {
+                continue;
+            }
+            let driver = fs::read_to_string(sensor.join("name")).unwrap_or_default();
+            if !matches!(driver.trim(), "nvme" | "drivetemp") {
+                continue;
+            }
+            if let Some(milli) = fs::read_to_string(sensor.join("temp1_input"))
+                .ok().and_then(|value| value.trim().parse::<i32>().ok())
+            {
+                return Some(format!("{:.0} °C", f64::from(milli) / 1000.0));
+            }
+        }
+    }
+    if !allow_smart_fallback || !path.starts_with("/dev") || !fs::metadata(path).ok()?.file_type().is_block_device() {
+        return None;
+    }
+    let mut command = Command::new("timeout");
+    command.env("LC_ALL", "C").args(["--kill-after=1s", "3s", "smartctl", "--attributes", "--json"]);
+    if let Some(adapter) = adapter.filter(|adapter| USB_TYPES.contains(adapter)) {
+        command.args(["-d", adapter]);
+    }
+    if disk.tran.as_deref() != Some("nvme") {
+        command.args(["-n", "standby"]);
+    }
+    let output = command.arg(path).output().ok()?;
+    temperature(&serde_json::from_slice(&output.stdout).ok()?)
+}
+
+fn temperature(data: &Value) -> Option<String> {
+    text(&data["temperature"]["current"])
+        .or_else(|| text(&data["nvme_smart_health_information_log"]["temperature"]))
+        .map(|value| format!("{value} °C"))
 }
 
 fn query_smart(path: &str, device_type: Option<&str>, elevation: bool) -> Result<Report> {
@@ -213,6 +256,11 @@ fn pci_vendor_name(id: u128) -> Option<String> {
 }
 
 impl Report {
+    #[cfg(feature = "desktop")]
+    pub fn temperature(&self) -> Option<String> {
+        temperature(&self.data)
+    }
+
     fn ata_statistics(&self) -> impl Iterator<Item = &Value> {
         self.data["ata_device_statistics"]["pages"].as_array().into_iter().flatten()
             .filter_map(|page| page["table"].as_array()).flatten()
@@ -326,7 +374,6 @@ impl Report {
                 .map(str::trim).filter(|value| !value.is_empty()).map(clean))
             .filter(|value| value != "ATA")
             .or_else(|| pci_id.and_then(pci_vendor_name));
-        let temperature = text(&data["temperature"]["current"]).or_else(|| text(&nvme["temperature"]));
         let hours = text(&data["power_on_time"]["hours"]).or_else(|| text(&nvme["power_on_hours"]))
             .or_else(|| text(statistic("Power-on Hours")));
         let written = host_bytes("written", "Logical Sectors Written", "Writes");
@@ -351,7 +398,7 @@ impl Report {
             ("NVMe PCI gyártóazonosító", pci_id.map(|id| format!("0x{id:04x}"))),
             ("SMART állapot", data["smart_status"]["passed"].as_bool()
                 .map(|passed| if passed { "Megfelelt".into() } else { "Hibát jelez".into() })),
-            ("Hőmérséklet", temperature.map(|value| format!("{value} °C"))),
+            (TEMPERATURE, temperature(data)),
             (POWER_ON_TIME, hours.map(|value| format!("{value} óra"))),
             ("Bekapcsolási ciklusok", text(&data["power_cycle_count"])
                 .or_else(|| text(&nvme["power_cycles"]))

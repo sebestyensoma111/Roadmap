@@ -9,10 +9,13 @@ extern "C" {
     pub fn gtk_builder_new_from_string(xml: *const c_char, length: isize) -> Object;
     pub fn gtk_builder_get_object(builder: Object, name: *const c_char) -> Object;
     pub fn gdk_display_get_default() -> Object;
+    pub fn gdk_texture_new_from_bytes(bytes: Object, error: *mut Object) -> Object;
     pub fn gtk_css_provider_new() -> Object;
     pub fn gtk_css_provider_load_from_data(provider: Object, data: *const c_char, length: isize);
     pub fn gtk_style_context_add_provider_for_display(display: Object, provider: Object, priority: c_uint);
     pub fn gtk_window_present(window: Object);
+    pub fn gtk_window_set_icon_name(window: Object, name: *const c_char);
+    pub fn gtk_image_set_from_paintable(image: Object, paintable: Object);
     pub fn gtk_widget_get_first_child(widget: Object) -> Object;
     pub fn gtk_widget_get_parent(widget: Object) -> Object;
     pub fn gtk_widget_set_sensitive(widget: Object, sensitive: c_int);
@@ -65,6 +68,9 @@ extern "C" {
 #[link(name = "libglib-2.0.so.0", kind = "dylib", modifiers = "+verbatim")]
 extern "C" {
     pub fn g_set_application_name(name: *const c_char);
+    pub fn g_set_prgname(name: *const c_char);
+    pub fn g_bytes_new_static(data: *const c_void, size: usize) -> Object;
+    pub fn g_bytes_unref(bytes: Object);
     pub fn g_main_loop_new(context: Object, running: c_int) -> Object;
     pub fn g_main_loop_run(main_loop: Object);
     pub fn g_main_loop_quit(main_loop: Object);

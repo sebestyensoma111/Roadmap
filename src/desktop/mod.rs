@@ -1,6 +1,6 @@
 mod gtk;
 
-use crate::devices::{self, Condition, Disk, Health, Report, Result, HOST_READ, HOST_WRITTEN, POWER_ON_TIME, USB_TYPES};
+use crate::devices::{self, Condition, Disk, Health, Report, Result, HOST_READ, HOST_WRITTEN, POWER_ON_TIME, TEMPERATURE, USB_TYPES};
 use gtk::*;
 use std::{
     cell::RefCell,
@@ -11,9 +11,14 @@ use std::{
     ptr,
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
+    time::{Duration, Instant},
 };
 
 const WINDOW: &str = include_str!("window.ui");
+const ICON: &[u8] = include_bytes!("roadmap-smart.png");
+const HEADER_ICON: &[u8] = include_bytes!("roadmap-smart-header.png");
+const APP_ID: &str = "roadmap-smart";
+const TEMPERATURE_INTERVAL: Duration = Duration::from_secs(5);
 const HEALTH_BAR_STYLE: &str = "
     progressbar.health-bar > trough,
     progressbar.health-bar > trough > progress {
@@ -32,6 +37,7 @@ struct Desktop {
     notebook: Object,
     heading: Object,
     subtitle: Object,
+    temperature_label: Object,
     health_panel: Object,
     health_condition: Object,
     health_endurance: Object,
@@ -46,6 +52,10 @@ struct Desktop {
     status: Object,
     disks: Vec<Disk>,
     job: Option<Receiver<Result<Report>>>,
+    temperature_job: Option<(u64, Receiver<Option<String>>)>,
+    temperature_generation: u64,
+    next_temperature: Instant,
+    last_temperature: Option<String>,
 }
 
 impl Desktop {
@@ -89,7 +99,12 @@ impl Desktop {
         self.show_disk();
     }
 
-    unsafe fn show_disk(&self) {
+    unsafe fn show_disk(&mut self) {
+        self.temperature_generation += 1;
+        self.last_temperature = None;
+        self.next_temperature = Instant::now();
+        gtk_widget_set_visible(self.temperature_label, self.selected().is_some().into());
+        label_text(self.temperature_label, "Hőfok · Lekérdezés…");
         gtk_widget_set_visible(self.health_panel, 0);
         clear_list(self.summary);
         buffer_text(self.full, "");
@@ -167,8 +182,7 @@ impl Desktop {
         }
         let Some(disk) = self.selected() else { return };
         let path = disk.path.clone();
-        let adapter = usize::try_from(gtk_combo_box_get_active(self.adapter) - 1)
-            .ok().and_then(|index| USB_TYPES.get(index).copied());
+        let adapter = self.selected_adapter();
         let (sender, receiver) = mpsc::channel();
         self.job = Some(receiver);
         self.set_busy(true);
@@ -177,6 +191,52 @@ impl Desktop {
         thread::spawn(move || {
             let _ = sender.send(devices::read_smart_desktop(&path, adapter));
         });
+    }
+
+    unsafe fn selected_adapter(&self) -> Option<&'static str> {
+        usize::try_from(gtk_combo_box_get_active(self.adapter) - 1)
+            .ok().and_then(|index| USB_TYPES.get(index).copied())
+    }
+
+    unsafe fn poll_temperature(&mut self) {
+        if let Some((generation, job)) = &self.temperature_job {
+            let reading = match job.try_recv() {
+                Ok(reading) => reading,
+                Err(TryRecvError::Empty) => return,
+                Err(TryRecvError::Disconnected) => None,
+            };
+            if *generation == self.temperature_generation {
+                match reading {
+                    Some(value) => {
+                        label_text(self.temperature_label, &format!("Hőfok · {value}"));
+                        self.last_temperature = Some(value);
+                    }
+                    None => self.show_last_temperature(),
+                }
+            }
+            self.temperature_job = None;
+        }
+
+        if Instant::now() < self.next_temperature {
+            return;
+        }
+        let Some(disk) = self.selected().cloned() else { return };
+        let adapter = self.selected_adapter();
+        let allow_smart_fallback = self.job.is_none();
+        let (sender, receiver) = mpsc::channel();
+        self.temperature_job = Some((self.temperature_generation, receiver));
+        self.next_temperature = Instant::now() + TEMPERATURE_INTERVAL;
+        thread::spawn(move || {
+            let _ = sender.send(devices::live_temperature(&disk, adapter, allow_smart_fallback));
+        });
+    }
+
+    unsafe fn show_last_temperature(&self) {
+        let label = match &self.last_temperature {
+            Some(value) => format!("Hőfok · {value} (utolsó ismert)"),
+            None => "Hőfok · Élő adat nem érhető el".into(),
+        };
+        label_text(self.temperature_label, &label);
     }
 
     unsafe fn receive(&mut self) {
@@ -190,6 +250,11 @@ impl Desktop {
         self.set_busy(false);
         match result {
             Ok(report) => {
+                if let Some(value) = report.temperature() {
+                    self.last_temperature = Some(value);
+                    self.show_last_temperature();
+                    self.next_temperature = Instant::now();
+                }
                 clear_list(self.summary);
                 for (name, value) in report.rows() {
                     let value = value.as_deref().unwrap_or("–");
@@ -197,6 +262,7 @@ impl Desktop {
                         HOST_WRITTEN => label_text(self.written_label, &format!("Összes írt adat · {value}")),
                         HOST_READ => label_text(self.read_label, &format!("Összes olvasott adat · {value}")),
                         POWER_ON_TIME => label_text(self.power_on_time_label, &format!("Üzemidő · {value}")),
+                        TEMPERATURE => (),
                         _ => self.add_row(name, value),
                     }
                 }
@@ -286,8 +352,18 @@ unsafe extern "C" fn read(_: Object, data: Object) {
 }
 
 unsafe extern "C" fn poll(data: Object) -> c_int {
-    with_desktop(data, |desktop| desktop.receive());
+    with_desktop(data, |desktop| {
+        desktop.receive();
+        desktop.poll_temperature();
+    });
     1
+}
+
+unsafe extern "C" fn adapter_changed(_: Object, data: Object) {
+    with_desktop(data, |desktop| {
+        desktop.temperature_generation += 1;
+        desktop.next_temperature = Instant::now();
+    });
 }
 
 unsafe extern "C" fn close(_: Object, data: Object) -> c_int {
@@ -302,6 +378,7 @@ unsafe fn connect(widget: Object, signal: &str, handler: Callback, data: Object)
 pub fn run() -> Result<()> {
     // GTK and its callbacks run on this thread. The state and builder outlive the main loop.
     unsafe {
+        g_set_prgname(c_text(APP_ID).as_ptr());
         if gtk_init_check() == 0 {
             return Err("A grafikus munkamenet nem érhető el.".into());
         }
@@ -314,6 +391,14 @@ pub fn run() -> Result<()> {
         let widget = |name| gtk_builder_get_object(builder, c_text(name).as_ptr());
         let main_loop = g_main_loop_new(ptr::null_mut(), 0);
         let window = widget("window");
+        gtk_window_set_icon_name(window, c_text(APP_ID).as_ptr());
+        let icon = g_bytes_new_static(HEADER_ICON.as_ptr().cast(), HEADER_ICON.len());
+        let texture = gdk_texture_new_from_bytes(icon, ptr::null_mut());
+        g_bytes_unref(icon);
+        if !texture.is_null() {
+            gtk_image_set_from_paintable(widget("app_icon"), texture);
+            g_object_unref(texture);
+        }
         let disks_list = widget("disks");
         let refresh_button = widget("refresh");
         let read_button = widget("read");
@@ -331,6 +416,7 @@ pub fn run() -> Result<()> {
             notebook: widget("notebook"),
             heading: widget("heading"),
             subtitle: widget("subtitle"),
+            temperature_label: widget("temperature"),
             health_panel: widget("health_panel"),
             health_condition: widget("health_condition"),
             health_endurance: widget("health_endurance"),
@@ -345,6 +431,10 @@ pub fn run() -> Result<()> {
             status: widget("status"),
             disks: Vec::new(),
             job: None,
+            temperature_job: None,
+            temperature_generation: 0,
+            next_temperature: Instant::now(),
+            last_temperature: None,
         });
         state.borrow_mut().show_disk();
         state.borrow_mut().refresh();
@@ -352,6 +442,7 @@ pub fn run() -> Result<()> {
         connect(refresh_button, "clicked", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(refresh), data);
         connect(read_button, "clicked", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(read), data);
         connect(disks_list, "row-selected", std::mem::transmute::<unsafe extern "C" fn(Object, Object, Object), Callback>(selected), data);
+        connect(adapter, "changed", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(adapter_changed), data);
         connect(window, "close-request", std::mem::transmute::<unsafe extern "C" fn(Object, Object) -> c_int, Callback>(close), main_loop);
         let source = g_timeout_add(100, poll, data);
 
@@ -380,10 +471,13 @@ pub fn install() -> Result<()> {
     let command = executable.replace('\\', r"\\\\")
         .replace('"', r#"\\""#).replace('$', r"\\$").replace('`', r"\\`").replace('%', "%%");
     let entry = format!(
-        "[Desktop Entry]\nType=Application\nName=Roadmap\nComment=Meghajtóállapot és SMART-adatok\nExec=\"{command}\" --gui\nIcon=drive-harddisk\nTerminal=false\nCategories=System;Monitor;\n"
+        "[Desktop Entry]\nType=Application\nName=Roadmap\nComment=Meghajtóállapot és SMART-adatok\nExec=\"{command}\" --gui\nIcon={APP_ID}\nStartupWMClass={APP_ID}\nTerminal=false\nCategories=System;Monitor;\n"
     );
+    let icons = data_home.join("icons/hicolor/256x256/apps");
+    fs::create_dir_all(&icons)?;
+    fs::write(icons.join(format!("{APP_ID}.png")), ICON)?;
     fs::create_dir_all(&applications)?;
-    let path = applications.join("roadmap-smart.desktop");
+    let path = applications.join(format!("{APP_ID}.desktop"));
     fs::write(&path, entry)?;
     println!("A Roadmap elérhető az alkalmazásmenüből. {}", path.display());
     Ok(())
