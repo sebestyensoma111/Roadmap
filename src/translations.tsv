@@ -1,0 +1,199 @@
+Nyelv	Language	Idioma	Sprache
+Meghajtók	Drives	Unidades	Laufwerke
+Meghajtó	Drive	Unidad	Laufwerk
+USB-adapter típusa	USB adapter type	Tipo de adaptador USB	USB-Adaptertyp
+Kondíció	Health status	Estado SMART	SMART-Zustand
+Hőfok	Temperature	Temperatura	Temperatur
+Üzemóra	Power-on time	Horas de uso	Betriebsstunden
+Írt adat	Data written	Datos escritos	Geschriebene Daten
+Változások	Changes	Cambios	Änderungen
+Összefoglaló	Summary	Resumen	Übersicht
+Mutató	Metric	Indicador	Kennzahl
+Előzmények	History	Historial	Verlauf
+Naplók	Logs	Registros	Protokolle
+Teljes jelentés	Full report	Informe completo	Vollständiger Bericht
+SMART lekérése	Read SMART	Leer SMART	SMART auslesen
+Mérési lap mentése…	Save measurement sheet…	Guardar ficha de medición…	Messblatt speichern…
+Mérés importálása…	Import measurement…	Importar medición…	Messung importieren…
+Aktuális mérés exportálása…	Export current measurement…	Exportar medición actual…	Aktuelle Messung exportieren…
+Sorozatszám feltüntetése	Include serial number	Incluir número de serie	Seriennummer anzeigen
+Minden érték	All values	Todos los valores	Alle Werte
+Meghajtók frissítése	Refresh drives	Actualizar unidades	Laufwerke aktualisieren
+Állapot	Health	Salud	Zustand
+Meghajtó állapotának alakulása	Drive health trend	Evolución de la salud de la unidad	Verlauf des Laufwerkszustands
+Bal oldali mérés	Left measurement	Medición de la izquierda	Linke Messung
+Jobb oldali mérés	Right measurement	Medición de la derecha	Rechte Messung
+Automatikus	Automatic	Automático	Automatisch
+Nincs SMART-jelentés.	No SMART report.	No hay informe SMART.	Kein SMART-Bericht vorhanden.
+Nincs meghajtó kiválasztva	No drive selected	Ninguna unidad seleccionada	Kein Laufwerk ausgewählt
+A meghajtólista nem frissíthető. {}	Could not refresh the drive list. {}	No se pudo actualizar la lista de unidades. {}	Laufwerksliste konnte nicht aktualisiert werden. {}
+Partíciók	Partitions	Particiones	Partitionen
+Partíció	Partition	Partición	Partition
+{} mentett mérés nem olvasható.	Saved measurements that could not be read: {}.	Mediciones guardadas que no se pudieron leer: {}.	Nicht lesbare gespeicherte Messungen: {}.
+Az előzmények nem olvashatók. {}	Could not read the measurement history. {}	No se pudo leer el historial de mediciones. {}	Der Messverlauf konnte nicht gelesen werden. {}
+{} élő	{} live	{} en directo	{} live
+{} mérve	{} recorded	{} registrado	{} gemessen
+Előző mentés · {}	Previous measurement · {}	Medición anterior · {}	Vorherige Messung · {}
+Nincs lényeges változás.	No significant changes.	No hay cambios importantes.	Keine wesentlichen Änderungen.
+Nincs összehasonlítható SMART-adat.	No comparable SMART data.	No hay datos SMART comparables.	Keine vergleichbaren SMART-Daten.
+Utolsó jelzett romlás · {}	Last detected decline · {}	Último deterioro detectado · {}	Zuletzt erkannte Verschlechterung · {}
+Nincs észlelt romlás a mentett mérések között.	No decline detected across saved measurements.	No se detectó deterioro entre las mediciones guardadas.	Keine Verschlechterung zwischen gespeicherten Messungen erkannt.
+Nincs mentett mérés.	No saved measurements.	No hay mediciones guardadas.	Keine gespeicherten Messungen.
+Állapot · {}%	Health · {}%	Salud · {}%	Zustand · {} %
+Azonos mérés.	Same measurement.	Es la misma medición.	Identische Messung.
+Nincs változás.	No changes.	No hay cambios.	Keine Änderungen.
+Jó	Good	Bueno	Gut
+Figyelmeztetés	Warning	Aviso	Warnung
+Kritikus	Critical	Crítico	Kritisch
+Ismeretlen	Unknown	Desconocido	Unbekannt
+SMART-adatok lekérése · {}	Reading SMART data · {}	Leyendo datos SMART · {}	SMART-Daten werden gelesen · {}
+{} (utolsó ismert)	{} (last known)	{} (último valor conocido)	{} (zuletzt bekannt)
+A SMART-lekérdezés megszakadt.	The SMART query was interrupted.	Se interrumpió la consulta SMART.	Die SMART-Abfrage wurde unterbrochen.
+A mérés nem menthető. {}	Could not save the measurement. {}	No se pudo guardar la medición. {}	Die Messung konnte nicht gespeichert werden. {}
+A SMART-lekérdezés sikertelen. {}	The SMART query failed. {}	Falló la consulta SMART. {}	Die SMART-Abfrage ist fehlgeschlagen. {}
+Állapotkód: {}	Status code: {}	Código de estado: {}	Statuscode: {}
+Mérés importálása	Import measurement	Importar medición	Messung importieren
+Mérés exportálása	Export measurement	Exportar medición	Messung exportieren
+Mérési lap mentése	Save measurement sheet	Guardar ficha de medición	Messblatt speichern
+Mentés	Save	Guardar	Speichern
+Importálás	Import	Importar	Importieren
+Mégse	Cancel	Cancelar	Abbrechen
+Mentve · {}	Saved · {}	Guardado · {}	Gespeichert · {}
+Nincs azonosítható SMART-mérés.	No identifiable SMART measurement.	No hay una medición SMART identificable.	Keine eindeutig zuordenbare SMART-Messung.
+Az importhoz normál fájlt válassz.	Choose a regular file to import.	Elige un archivo normal para importar.	Wähle eine reguläre Datei für den Import.
+A mérés fájlja túl nagy.	The measurement file is too large.	El archivo de medición es demasiado grande.	Die Messdatei ist zu groß.
+Ez a mérés már megvan.	This measurement is already saved.	Esta medición ya está guardada.	Diese Messung ist bereits gespeichert.
+Mérés importálva.	Measurement imported.	Medición importada.	Messung importiert.
+Ismeretlen mérési idő	Unknown measurement time	Fecha de medición desconocida	Unbekannter Messzeitpunkt
+A fájl már létezik. Válassz új nevet.	The file already exists. Choose another name.	El archivo ya existe. Elige otro nombre.	Die Datei existiert bereits. Wähle einen anderen Namen.
+Nincs kiválasztva fájl.	No file selected.	No se ha seleccionado ningún archivo.	Keine Datei ausgewählt.
+Helyi fájlt válassz.	Choose a local file.	Elige un archivo local.	Wähle eine lokale Datei.
+A nyelvi beállítás nem menthető. {}	Could not save the language preference. {}	No se pudo guardar la preferencia de idioma. {}	Die Spracheinstellung konnte nicht gespeichert werden. {}
+A grafikus munkamenet nem érhető el.	The graphical session is unavailable.	La sesión gráfica no está disponible.	Die grafische Sitzung ist nicht verfügbar.
+A felhasználói adatmappa nem található.	The user data directory could not be located.	No se encontró el directorio de datos del usuario.	Das Benutzerdatenverzeichnis wurde nicht gefunden.
+A program elérési útja érvénytelen.	The program path is invalid.	La ruta del programa no es válida.	Der Programmpfad ist ungültig.
+A program elérési útja vezérlőkaraktert tartalmaz.	The program path contains a control character.	La ruta del programa contiene un carácter de control.	Der Programmpfad enthält ein Steuerzeichen.
+A Roadmap elérhető az alkalmazásmenüből. {}	Roadmap is available in the application menu. {}	Roadmap está disponible en el menú de aplicaciones. {}	Roadmap ist im Anwendungsmenü verfügbar. {}
+A célmappa nem található.	The destination directory could not be found.	No se encontró la carpeta de destino.	Der Zielordner wurde nicht gefunden.
+Kapacitás	Capacity	Capacidad	Kapazität
+Üzemidő	Power-on time	Tiempo de uso	Betriebszeit
+Eddig írt adat	Data written	Datos escritos	Geschriebene Daten
+Jó állapot	Good health	Buen estado	Guter Zustand
+Érdemes ellenőrizni	Check recommended	Se recomienda revisar	Überprüfung empfohlen
+Kritikus állapot	Critical condition	Estado crítico	Kritischer Zustand
+Az állapot ismeretlen	Unknown condition	Estado desconocido	Unbekannter Zustand
+Mérési lap	Measurement sheet	Ficha de medición	Messblatt
+Mérés ideje: {}	Measured at: {}	Fecha de medición: {}	Messzeitpunkt: {}
+Sorozatszám: {}	Serial number: {}	Número de serie: {}	Seriennummer: {}
+A mérési lap nem készíthető el.	Could not create the measurement sheet.	No se pudo crear la ficha de medición.	Das Messblatt konnte nicht erstellt werden.
+ · Állapot: {}%	 · Health: {}%	 · Salud: {}%	 · Zustand: {} %
+Romlás az előző mérés óta.	Decline since the previous measurement.	Deterioro desde la medición anterior.	Verschlechterung seit der letzten Messung.
+SMART-kondíció	SMART health	Estado SMART	SMART-Zustand
+Jelzett romlás	Detected decline	Deterioro detectado	Verschlechterung
+Jó SMART-állapot	Good SMART health	Buen estado SMART	Guter SMART-Zustand
+Figyelmeztetés · adathordozó-hibák	Warning · media errors	Aviso · errores del medio	Warnung · Medienfehler
+Figyelmeztetés · alacsony hátralévő élettartam	Warning · low endurance	Aviso · vida útil restante baja	Warnung · geringe verbleibende Lebensdauer
+Kritikus SMART-jelzés	Critical SMART warning	Alerta crítica SMART	Kritische SMART-Warnung
+SMART-állapot nem érhető el	SMART status unavailable	Estado SMART no disponible	SMART-Zustand nicht verfügbar
+Teljes meghajtót vagy NVMe-vezérlőt válassz a /dev alól.	Choose a whole drive or an NVMe controller under /dev.	Elige una unidad completa o un controlador NVMe en /dev.	Wähle ein vollständiges Laufwerk oder einen NVMe-Controller unter /dev.
+A smartctl rendszerparancs nem található.	The smartctl command could not be found.	No se encontró el comando smartctl.	Der Befehl smartctl wurde nicht gefunden.
+Ismeretlen USB-adaptertípus.	Unknown USB adapter type.	Tipo de adaptador USB desconocido.	Unbekannter USB-Adaptertyp.
+A SMART-lekérdezés túllépte az időkorlátot.	The SMART query timed out.	Se agotó el tiempo de espera de la consulta SMART.	Zeitüberschreitung bei der SMART-Abfrage.
+A hitelesítést megszakították.	Authentication was cancelled.	Se canceló la autenticación.	Die Authentifizierung wurde abgebrochen.
+A grafikus hitelesítés sikertelen. {}	Graphical authentication failed. {}	Falló la autenticación gráfica. {}	Die grafische Authentifizierung ist fehlgeschlagen. {}
+A smartctl nem adott érvényes JSON-jelentést: {}	smartctl did not return a valid JSON report: {}	smartctl no devolvió un informe JSON válido: {}	smartctl hat keinen gültigen JSON-Bericht geliefert: {}
+ATA hibanapló	ATA error log	Registro de errores ATA	ATA-Fehlerprotokoll
+ATA öntesztnapló	ATA self-test log	Registro de autopruebas ATA	ATA-Selbsttestprotokoll
+NVMe hibanapló	NVMe error log	Registro de errores NVMe	NVMe-Fehlerprotokoll
+NVMe öntesztnapló	NVMe self-test log	Registro de autopruebas NVMe	NVMe-Selbsttestprotokoll
+SCSI hibaszámlálók	SCSI error counters	Contadores de errores SCSI	SCSI-Fehlerzähler
+SCSI öntesztnapló	SCSI self-test log	Registro de autopruebas SCSI	SCSI-Selbsttestprotokoll
+A meghajtó jelentésében nincs elérhető hiba- vagy öntesztnapló.	The drive report has no error or self-test logs.	El informe de la unidad no incluye registros de errores ni de autopruebas.	Der Laufwerksbericht enthält keine Fehler- oder Selbsttestprotokolle.
+{} függőben lévő szektor	Pending sectors: {}	Sectores pendientes: {}	Ausstehende Sektoren: {}
+{} áthelyezett szektor	Reallocated sectors: {}	Sectores reasignados: {}	Neu zugewiesene Sektoren: {}
+{} javíthatatlan szektor	Uncorrectable sectors: {}	Sectores incorregibles: {}	Nicht korrigierbare Sektoren: {}
+{} javíthatatlan hiba	Uncorrectable errors: {}	Errores incorregibles: {}	Nicht korrigierbare Fehler: {}
+{} NVMe médiahiba	NVMe media errors: {}	Errores de medio NVMe: {}	NVMe-Medienfehler: {}
+A meghajtó SMART-hibát jelez.	The drive reports a SMART failure.	La unidad indica un fallo SMART.	Das Laufwerk meldet einen SMART-Fehler.
+Kevés tartalékkapacitás	Low spare capacity	Poca capacidad de reserva	Geringe Reservekapazität
+Hőmérséklet a határértéken kívül	Temperature outside limits	Temperatura fuera de los límites	Temperatur außerhalb der Grenzwerte
+Csökkent megbízhatóság	Reduced reliability	Fiabilidad reducida	Verminderte Zuverlässigkeit
+A meghajtó csak olvasható	The drive is read-only	La unidad es de solo lectura	Das Laufwerk ist schreibgeschützt
+A felejtő memória mentése hibás	Volatile memory backup failed	Fallo en la copia de seguridad de la memoria volátil	Sicherung des flüchtigen Speichers fehlgeschlagen
+A tartós memóriaterület csak olvasható vagy megbízhatatlan	Persistent memory is read-only or unreliable	La memoria persistente es de solo lectura o no es fiable	Der persistente Speicher ist schreibgeschützt oder unzuverlässig
+Ismeretlen NVMe-jelzés · {}	Unknown NVMe warning · {}	Aviso NVMe desconocido · {}	Unbekannte NVMe-Warnung · {}
+{} lemezterület ellenőrzésre vár.	Disk sectors awaiting a check: {}.	Sectores del disco pendientes de revisión: {}.	Zu prüfende Laufwerkssektoren: {}.
+Alacsony hátralévő élettartam.	Low remaining endurance.	Poca vida útil restante.	Geringe verbleibende Lebensdauer.
+Eszköz	Device	Dispositivo	Gerät
+Gyártó	Manufacturer	Fabricante	Hersteller
+Modellcsalád	Model family	Familia de modelos	Modellfamilie
+Modell	Model	Modelo	Modell
+Sorozatszám	Serial number	Número de serie	Seriennummer
+Protokoll	Protocol	Protocolo	Protokoll
+Logikai szektor	Logical sector	Sector lógico	Logischer Sektor
+Fizikai szektor	Physical sector	Sector físico	Physischer Sektor
+Fordulatszám	Rotation speed	Velocidad de rotación	Drehzahl
+NVMe PCI gyártóazonosító	NVMe PCI vendor ID	ID del fabricante PCI NVMe	NVMe-PCI-Hersteller-ID
+SMART állapot	SMART status	Estado SMART	SMART-Status
+Megfelelt	Passed	Correcto	Bestanden
+Hibát jelez	Failure reported	Indica un fallo	Fehler gemeldet
+Hőmérséklet	Temperature	Temperatura	Temperatur
+{} óra	{} h	{} h	{} h
+Bekapcsolási ciklusok	Power cycles	Ciclos de encendido	Einschaltzyklen
+Motor indítás/leállítás	Motor start/stop cycles	Ciclos de arranque y parada del motor	Motor-Start-/Stoppzyklen
+Szabálytalan leállások	Unsafe shutdowns	Apagados inesperados	Unsichere Abschaltungen
+Vészparkolások (ATA)	Emergency head parks (ATA)	Estacionamientos de emergencia (ATA)	Notparkvorgänge der Köpfe (ATA)
+Összes írt adat (host)	Total host writes	Total escrito por el host	Vom Host geschriebene Daten
+Összes olvasott adat (host)	Total host reads	Total leído por el host	Vom Host gelesene Daten
+Írási parancsok	Write commands	Órdenes de escritura	Schreibbefehle
+Olvasási parancsok	Read commands	Órdenes de lectura	Lesebefehle
+NVMe elhasználódás	NVMe wear	Desgaste NVMe	NVMe-Verschleiß
+NVMe tartalékkapacitás	NVMe spare capacity	Capacidad de reserva NVMe	NVMe-Reservekapazität
+NVMe médiahibák	NVMe media errors	Errores de medio NVMe	NVMe-Medienfehler
+Áthelyezett szektorok	Reallocated sectors	Sectores reasignados	Neu zugewiesene Sektoren
+Függőben lévő szektorok	Pending sectors	Sectores pendientes	Ausstehende Sektoren
+Javíthatatlan ATA szektorok	Uncorrectable ATA sectors	Sectores ATA incorregibles	Nicht korrigierbare ATA-Sektoren
+SCSI utólagos hibák	SCSI grown defects	Defectos SCSI detectados después de fábrica	Nachträglich erkannte SCSI-Defekte
+SCSI javíthatatlan olvasási hibák	Uncorrectable SCSI read errors	Errores de lectura SCSI incorregibles	Nicht korrigierbare SCSI-Lesefehler
+SCSI javíthatatlan írási hibák	Uncorrectable SCSI write errors	Errores de escritura SCSI incorregibles	Nicht korrigierbare SCSI-Schreibfehler
+Nyers ATA írásszámláló	Raw ATA write counter	Contador bruto de escrituras ATA	ATA-Schreibzähler (Rohwert)
+Nem érhető el	Unavailable	No disponible	Nicht verfügbar
+SMART állapotkód: {}	SMART status code: {}	Código de estado SMART: {}	SMART-Statuscode: {}
+1 Összefoglaló	1 Summary	1 Resumen	1 Übersicht
+2 Teljes jelentés	2 Full report	2 Informe completo	2 Vollständiger Bericht
+Nincs meghajtó. Az R frissíti a listát.	No drives found. Press R to refresh.	No hay unidades. Pulsa R para actualizar.	Keine Laufwerke. R aktualisiert die Liste.
+Enter – SMART-lekérdezés	Enter – read SMART	Enter – leer SMART	Enter – SMART auslesen
+Lista frissítése: {}	Could not refresh the list: {}	No se pudo actualizar la lista: {}	Liste konnte nicht aktualisiert werden: {}
+SMART-jelentés · {}	SMART report · {}	Informe SMART · {}	SMART-Bericht · {}
+SMART állapotkód: {} · {}	SMART status code: {} · {}	Código de estado SMART: {} · {}	SMART-Statuscode: {} · {}
+Meghajtók és SMART	Drives and SMART	Unidades y SMART	Laufwerke und SMART
+Meghajtóadatok	Drive details	Datos de la unidad	Laufwerksdaten
+↑↓ Meghajtó   Enter SMART   R Frissítés   Q Kilépés	↑↓ Drive   Enter SMART   R Refresh   Q Quit	↑↓ Unidad   Enter SMART   R Actualizar   Q Salir	↑↓ Laufwerk   Enter SMART   R Aktualisieren   Q Beenden
+PgUp/PgDn vagy J/K Görgetés   ←→ Oldalra	PgUp/PgDn or J/K Scroll   ←→ Sideways	PgUp/PgDn o J/K Desplazar   ←→ Lateral	PgUp/PgDn oder J/K Scrollen   ←→ Seitlich
+A TUI-hoz terminál szükséges. Szkripthez használd a list vagy smart parancsot.	The terminal interface requires a terminal. Use list or smart in scripts.	La interfaz de texto requiere una terminal. Usa list o smart en scripts.	Die Textoberfläche benötigt ein Terminal. Verwende list oder smart in Skripten.
+Linux SMART-lekérdezés	Linux SMART monitoring	Consulta SMART en Linux	SMART-Abfrage unter Linux
+ESZKÖZ	DEVICE	DISPOSITIVO	GERÄT
+USB-TÍPUS	USB-TYPE	TIPO-USB	USB-TYP
+A --type kapcsolóhoz USB-típus szükséges.	The --type option requires a USB type.	La opción --type requiere un tipo USB.	Die Option --type benötigt einen USB-Typ.
+Ismeretlen vagy ismételt kapcsoló: {}	Unknown or repeated option: {}	Opción desconocida o repetida: {}	Unbekannte oder wiederholte Option: {}
+Érvénytelen parancs. Súgó: roadmap --help	Invalid command. Help: roadmap --help	Comando no válido. Ayuda: roadmap --help	Ungültiger Befehl. Hilfe: roadmap --help
+Hiba: {}	Error: {}	Error: {}	Fehler: {}
+A méréshez hiányzik a meghajtó kapacitása.	The measurement is missing the drive capacity.	Falta la capacidad de la unidad en la medición.	In der Messung fehlt die Laufwerkskapazität.
+Érvénytelen Roadmap-mérés.	Invalid Roadmap measurement.	Medición de Roadmap no válida.	Ungültige Roadmap-Messung.
+A mérés fájlverziója nem támogatott.	The measurement file version is unsupported.	La versión del archivo de medición no es compatible.	Die Version der Messdatei wird nicht unterstützt.
+A fájl másik meghajtóhoz tartozik.	The file belongs to a different drive.	El archivo corresponde a otra unidad.	Die Datei gehört zu einem anderen Laufwerk.
+A mérés adatai érvénytelenek.	The measurement data is invalid.	Los datos de la medición no son válidos.	Die Messdaten sind ungültig.
+Új állapot: {}.	New status: {}.	Nuevo estado: {}.	Neuer Zustand: {}.
+Az állapot most {}.	Health is now {}.	La salud ahora es del {}.	Der Zustand liegt jetzt bei {}.
+{} órával többet üzemelt.	Additional hours of use: {}.	Horas adicionales de uso: {}.	Zusätzliche Betriebsstunden: {}.
+Az összes írt adat most {}.	Total data written is now {}.	El total de datos escritos es ahora de {}.	Insgesamt wurden jetzt {} geschrieben.
+{} szektorral több vár ellenőrzésre.	Additional sectors awaiting a check: {}.	Sectores adicionales pendientes de revisión: {}.	Zusätzliche zu prüfende Sektoren: {}.
+{} új áthelyezett szektor.	New reallocated sectors: {}.	Nuevos sectores reasignados: {}.	Neu zugewiesene Sektoren seit der letzten Messung: {}.
+{} új médiahiba.	New media errors: {}.	Nuevos errores de medio: {}.	Neue Medienfehler: {}.
+{} új javíthatatlan szektor.	New uncorrectable sectors: {}.	Nuevos sectores incorregibles: {}.	Neue nicht korrigierbare Sektoren: {}.
+{} újonnan észlelt lemezhiba.	Newly detected disk defects: {}.	Nuevos defectos de disco detectados: {}.	Neu erkannte Laufwerksdefekte: {}.
+{} új javíthatatlan olvasási hiba.	New uncorrectable read errors: {}.	Nuevos errores de lectura incorregibles: {}.	Neue nicht korrigierbare Lesefehler: {}.
+{} új javíthatatlan írási hiba.	New uncorrectable write errors: {}.	Nuevos errores de escritura incorregibles: {}.	Neue nicht korrigierbare Schreibfehler: {}.
+roadmap-meres.json	roadmap-measurement.json	roadmap-medicion.json	roadmap-messung.json
+roadmap-meresi-lap.png	roadmap-measurement-sheet.png	roadmap-ficha-de-medicion.png	roadmap-messblatt.png
+ismeretlen modell	unknown model	modelo desconocido	unbekanntes Modell

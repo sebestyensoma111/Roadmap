@@ -22,6 +22,8 @@ Az ablakot saját felhasználóval indítsd. A Roadmap szükség esetén a SMART
 
 ## Grafikus felület
 
+A fejléc nyelvválasztójában magyar, angol, spanyol és német nyelv közül választhatsz. A váltás azonnali, a beállítás újraindítás után is megmarad. A terminálos felület, a Roadmap parancssori üzenetei és a PNG mérési lap is a kiválasztott nyelvet használja. A nyers SMART-naplók és a JSON tartalma eredeti formában jelenik meg.
+
 1. Válassz egy meghajtót a bal oldali listában, majd kattints a **SMART lekérése** gombra.
 2. Az összefoglaló mutatja a kondíciót és a figyelmeztetés okát. Az **Állapot** százalék akkor jelenik meg, ha a meghajtó közöl élettartamra vonatkozó kopásadatot. A mező az ebből számolt, becsült hátralévő névleges élettartamot mutatja.
 3. A **Naplók** fül a meghajtó által közölt hiba- és öntesztnaplót mutatja. A teljes SMART-kimenet a **Teljes jelentés** és **JSON** füleken érhető el.

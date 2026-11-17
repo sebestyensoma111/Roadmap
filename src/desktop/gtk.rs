@@ -5,6 +5,7 @@ pub type Callback = unsafe extern "C" fn();
 pub const FILE_CHOOSER_SAVE: c_int = 1;
 pub const FILE_CHOOSER_OPEN: c_int = 0;
 pub const RESPONSE_ACCEPT: c_int = -3;
+pub const ACCESSIBLE_LABEL: c_int = 4;
 
 #[link(name = "libgtk-4.so.1", kind = "dylib", modifiers = "+verbatim")]
 extern "C" {
@@ -24,6 +25,10 @@ extern "C" {
     pub fn gtk_widget_get_parent(widget: Object) -> Object;
     pub fn gtk_widget_set_sensitive(widget: Object, sensitive: c_int);
     pub fn gtk_widget_set_visible(widget: Object, visible: c_int);
+    pub fn gtk_widget_set_tooltip_text(widget: Object, text: *const c_char);
+    pub fn gtk_button_set_label(button: Object, text: *const c_char);
+    pub fn gtk_check_button_set_label(button: Object, text: *const c_char);
+    pub fn gtk_accessible_update_property(accessible: Object, first_property: c_int, ...);
     pub fn gtk_widget_queue_draw(widget: Object);
     pub fn gtk_widget_get_width(widget: Object) -> c_int;
     pub fn gtk_tooltip_set_text(tooltip: Object, text: *const c_char);

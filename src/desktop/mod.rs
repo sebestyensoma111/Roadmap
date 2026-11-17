@@ -3,6 +3,8 @@ mod history;
 mod sheet;
 mod trend;
 
+use crate::i18n::{self, message, metric, tr};
+
 use crate::devices::{self, Condition, Disk, Health, Report, Result, HOST_WRITTEN, POWER_ON_TIME, TEMPERATURE, USB_TYPES};
 use gtk::*;
 use history::{DriveId, History, Snapshot};
@@ -77,9 +79,10 @@ impl Measurement {
             }
         });
         let remaining = self.health.remaining.map(|percent| format!("{percent}%"));
+        let hours = value(POWER_ON_TIME).map(|value| metric(POWER_ON_TIME, value));
         let metrics: Vec<_> = [
             ("Kapacitás", capacity.as_deref()),
-            ("Üzemidő", value(POWER_ON_TIME)),
+            ("Üzemidő", hours.as_deref()),
             ("Eddig írt adat", value(HOST_WRITTEN)),
             ("Állapot", remaining.as_deref()),
         ].into_iter().filter_map(|(name, value)| Some((name, value?))).collect();
@@ -89,16 +92,11 @@ impl Measurement {
             Condition::Critical => "Kritikus állapot",
             Condition::Unavailable => "Az állapot ismeretlen",
         };
-        let reason = self.report.health_reason(&self.health).map(|reason| {
-            match reason.strip_suffix(" függőben lévő szektor") {
-                Some(count) => format!("{count} lemezterület ellenőrzésre vár."),
-                None => reason,
-            }
-        });
+        let reason = self.report.health_reason(&self.health, true);
         sheet::render(&sheet::Sheet {
-            model: value("Modell").unwrap_or("Meghajtó"),
+            model: value("Modell").unwrap_or_else(|| tr("Meghajtó")),
             condition: self.health.condition,
-            status,
+            status: tr(status),
             reason: reason.as_deref(),
             metrics: &metrics,
             measured: &date_label(self.measured),
@@ -114,6 +112,7 @@ enum FileAction {
 
 struct Desktop {
     window: Object,
+    builder: Object,
     disks_list: Object,
     disk_controls: [Object; 3],
     read_button: Object,
@@ -148,11 +147,12 @@ struct Desktop {
     json: Object,
     spinner: Object,
     status: Object,
+    notice: Option<(&'static str, String)>,
     disks: Vec<Disk>,
     disk_metrics: Vec<Object>,
     measurements: HashMap<String, Rc<Measurement>>,
     history: History,
-    history_issue: Option<String>,
+    history_issue: Option<(&'static str, String)>,
     export_dialog: Option<(Object, FileAction)>,
     rendered_tabs: [bool; 3],
     job: Option<Receiver<Result<Measurement>>>,
@@ -166,6 +166,86 @@ struct Desktop {
 }
 
 impl Desktop {
+    unsafe fn localize_widgets(&self) {
+        let widget = |id| gtk_builder_get_object(self.builder, c_text(id).as_ptr());
+        for (id, text) in [
+            ("drives_title", "Meghajtók"),
+            ("adapter_title", "USB-adapter típusa"),
+            ("condition_title", "Kondíció"),
+            ("temperature_title", "Hőfok"),
+            ("hours_title", "Üzemóra"),
+            ("written_title", "Írt adat"),
+            ("changes_title", "Változások"),
+            ("summary_tab", "Összefoglaló"),
+            ("metric_title", "Mutató"),
+            ("history_tab", "Előzmények"),
+            ("diagnostics_tab", "Naplók"),
+            ("full_tab", "Teljes jelentés"),
+        ] {
+            label_text(widget(id), tr(text));
+        }
+        for (id, text) in [
+            ("read", "SMART lekérése"),
+            ("export_sheet", "Mérési lap mentése…"),
+            ("import_measurement", "Mérés importálása…"),
+            ("export_measurement", "Aktuális mérés exportálása…"),
+        ] {
+            gtk_button_set_label(widget(id), c_text(tr(text)).as_ptr());
+        }
+        for (id, text) in [
+            ("export_serial", "Sorozatszám feltüntetése"),
+            ("history_all", "Minden érték"),
+        ] {
+            gtk_check_button_set_label(widget(id), c_text(tr(text)).as_ptr());
+        }
+        gtk_widget_set_tooltip_text(widget("refresh"), c_text(tr("Meghajtók frissítése")).as_ptr());
+        gtk_widget_set_tooltip_text(widget("language"), c_text(tr("Nyelv")).as_ptr());
+        for (id, text) in [
+            ("language", "Nyelv"),
+            ("health_bar", "Állapot"),
+            ("history_trend", "Meghajtó állapotának alakulása"),
+            ("history_before", "Bal oldali mérés"),
+            ("history_after", "Jobb oldali mérés"),
+        ] {
+            gtk_accessible_update_property(widget(id), ACCESSIBLE_LABEL, c_text(tr(text)).as_ptr(), -1i32);
+        }
+        let adapter = gtk_combo_box_get_active(self.adapter).max(0);
+        gtk_combo_box_text_remove_all(self.adapter);
+        for name in std::iter::once(tr("Automatikus")).chain(USB_TYPES.iter().copied()) {
+            gtk_combo_box_text_append_text(self.adapter, c_text(name).as_ptr());
+        }
+        gtk_combo_box_set_active(self.adapter, adapter);
+    }
+
+    unsafe fn localize(&mut self) {
+        self.localize_widgets();
+        for index in 0..self.disks.len() {
+            let temperature = if self.live_disk == Some(index) {
+                self.last_temperature.as_deref()
+            } else {
+                None
+            };
+            self.show_disk_metrics(index, temperature);
+        }
+        if self.live_disk.is_none() {
+            self.show_last_temperature();
+        }
+        self.show_history();
+        self.rendered_tabs[0] = false;
+        if let Some(measurement) = self.measurement() {
+            self.show_measurement(&measurement);
+        } else {
+            buffer_text(self.diagnostics, tr("Nincs SMART-jelentés."));
+            if let Some(disk) = self.selected() {
+                clear_list(self.summary);
+                self.show_partitions(disk);
+            } else {
+                label_text(self.heading, tr("Nincs meghajtó kiválasztva"));
+            }
+            self.show_status();
+        }
+    }
+
     unsafe fn selected_index(&self) -> Option<usize> {
         let row = gtk_list_box_get_selected_row(self.disks_list);
         (!row.is_null()).then(|| gtk_list_box_row_get_index(row) as usize)
@@ -186,7 +266,7 @@ impl Desktop {
         match devices::disks() {
             Ok(disks) => self.disks = disks,
             Err(error) => {
-                label_text(self.status, &format!("A meghajtólista nem frissíthető. {error}"));
+                self.set_notice("A meghajtólista nem frissíthető. {}", error.to_string());
                 return;
             }
         }
@@ -228,6 +308,7 @@ impl Desktop {
     }
 
     unsafe fn show_disk(&mut self) {
+        self.notice = None;
         if let Some(index) = self.live_disk.take() {
             self.show_disk_metrics(index, None);
         }
@@ -249,14 +330,14 @@ impl Desktop {
         clear_list(self.summary);
         buffer_text(self.full, "");
         buffer_text(self.json, "");
-        buffer_text(self.diagnostics, "Nincs SMART-jelentés.");
+        buffer_text(self.diagnostics, tr("Nincs SMART-jelentés."));
         self.rendered_tabs = [false; 3];
         gtk_notebook_set_current_page(self.notebook, 0);
         self.show_history();
         self.set_busy(false);
         let Some(disk) = self.selected() else {
             gtk_widget_set_sensitive(self.read_button, 0);
-            label_text(self.heading, "Nincs meghajtó kiválasztva");
+            label_text(self.heading, tr("Nincs meghajtó kiválasztva"));
             label_text(self.subtitle, "");
             label_text(self.status, "");
             return;
@@ -269,6 +350,11 @@ impl Desktop {
             self.show_measurement(&measurement);
             return;
         }
+        self.show_partitions(disk);
+        label_text(self.status, "");
+    }
+
+    unsafe fn show_partitions(&self, disk: &Disk) {
         let mut partitions = disk.partitions().peekable();
         if partitions.peek().is_none() {
             self.add_row("Partíciók", "–");
@@ -277,16 +363,15 @@ impl Desktop {
                 self.add_row("Partíció", &partition);
             }
         }
-        label_text(self.status, "");
     }
 
     fn reload_history(&mut self) {
         match History::load() {
             Ok((history, unreadable)) => {
                 self.history = history;
-                self.history_issue = (unreadable > 0).then(|| format!("{unreadable} mentett mérés nem olvasható."));
+                self.history_issue = (unreadable > 0).then(|| ("{} mentett mérés nem olvasható.", unreadable.to_string()));
             }
-            Err(error) => self.history_issue = Some(format!("Az előzmények nem olvashatók. {error}")),
+            Err(error) => self.history_issue = Some(("Az előzmények nem olvashatók. {}", error.to_string())),
         }
     }
 
@@ -299,13 +384,13 @@ impl Desktop {
         let measured = measurement.map(|item| item.measured).or_else(|| saved.map(|item| item.measured));
         let last_temperature = measurement.and_then(|item| item.report.temperature())
             .or_else(|| saved.and_then(|item| item.values.get(TEMPERATURE).cloned()));
-        let mut details = condition.map_or_else(String::new, |value| value.label().to_string());
+        let mut details = condition.map_or_else(String::new, |value| tr(value.label()).to_string());
         if let Some(value) = live_temperature {
             if !details.is_empty() { details.push_str(" · "); }
-            details.push_str(&format!("{value} élő"));
+            details.push_str(&message("{} élő", &[value]));
         } else if let Some(value) = last_temperature {
             if !details.is_empty() { details.push_str(" · "); }
-            details.push_str(&format!("{value} mérve"));
+            details.push_str(&message("{} mérve", &[&value]));
         }
         if let Some(time) = measured {
             details.push_str(&format!("\n{}", date_label(time)));
@@ -330,10 +415,10 @@ impl Desktop {
         };
         gtk_widget_set_visible(self.changes_card, 1);
         let changes = current.changes(&previous);
-        let mut lines = vec![format!("Előző mentés · {}", date_label(previous.measured))];
+        let mut lines = vec![message("Előző mentés · {}", &[&date_label(previous.measured)])];
         if changes.is_empty() {
-            lines.push(if current.comparable_to(&previous) { "Nincs lényeges változás." }
-                else { "Nincs összehasonlítható SMART-adat." }.into());
+            lines.push(tr(if current.comparable_to(&previous) { "Nincs lényeges változás." }
+                else { "Nincs összehasonlítható SMART-adat." }).into());
         }
         for (line, alert) in changes {
             let line = line.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
@@ -355,8 +440,8 @@ impl Desktop {
         gtk_widget_set_visible(self.history_trend_note, has_pair.into());
         if has_pair {
             let latest = self.history_samples.windows(2).find(|pair| pair[0].worsened_since(&pair[1]));
-            let note = latest.map(|pair| format!("Utolsó jelzett romlás · {}", date_label(pair[0].measured)))
-                .unwrap_or_else(|| "Nincs észlelt romlás a mentett mérések között.".into());
+            let note = latest.map(|pair| message("Utolsó jelzett romlás · {}", &[&date_label(pair[0].measured)]))
+                .unwrap_or_else(|| tr("Nincs észlelt romlás a mentett mérések között.").into());
             label_text(self.history_trend_note, &note);
             gtk_widget_queue_draw(self.history_trend);
         }
@@ -395,8 +480,8 @@ impl Desktop {
 
     unsafe fn render_history_comparison(&self) {
         clear_list(self.history_list);
-        if let Some(issue) = &self.history_issue {
-            self.add_history_row(issue, true);
+        if let Some((key, detail)) = &self.history_issue {
+            self.add_history_row(&message(key, &[&i18n::error(detail)]), true);
         }
         if self.history_samples.is_empty() {
             self.add_history_row("Nincs mentett mérés.", false);
@@ -404,12 +489,12 @@ impl Desktop {
         }
         if self.history_samples.len() == 1 {
             let snapshot = &self.history_samples[0];
-            self.add_history_row(&format!("{} · {}", date_label(snapshot.measured), snapshot.condition.label()), false);
+            self.add_history_row(&format!("{} · {}", date_label(snapshot.measured), tr(snapshot.condition.label())), false);
             if let Some(percent) = snapshot.remaining {
-                self.add_history_row(&format!("Állapot · {percent}%"), false);
+                self.add_history_row(&message("Állapot · {}%", &[&percent.to_string()]), false);
             }
             for (field, value) in &snapshot.values {
-                self.add_history_row(&format!("{field} · {value}"), false);
+                self.add_history_row(&format!("{} · {}", tr(field), metric(field, value)), false);
             }
             return;
         }
@@ -436,7 +521,14 @@ impl Desktop {
             let row = gtk_box_new(0, 8);
             gtk_box_set_homogeneous(row, 1);
             margins(row, 10);
-            for value in [change.field, left, right] {
+            let display = |value| {
+                if change.field == "Kondíció" {
+                    std::borrow::Cow::Borrowed(tr(value))
+                } else {
+                    metric(change.field, value)
+                }
+            };
+            for value in [tr(change.field), &display(left), &display(right)] {
                 let item = label(value);
                 gtk_label_set_selectable(item, 1);
                 if change.warning { css(item, "roadmap-warning"); }
@@ -448,7 +540,7 @@ impl Desktop {
     }
 
     unsafe fn add_history_row(&self, text: &str, warning: bool) {
-        let item = label(text);
+        let item = label(tr(text));
         margins(item, 10);
         gtk_label_set_selectable(item, 1);
         if warning { css(item, "roadmap-warning"); }
@@ -465,14 +557,14 @@ impl Desktop {
             Some(Condition::Unavailable) => ("#808080", "Ismeretlen"),
             None => ("#808080", "–"),
         };
-        let badge = format!("<span foreground=\"{color}\">●</span>  <b>{condition}</b>");
+        let badge = format!("<span foreground=\"{color}\">●</span>  <b>{}</b>", tr(condition));
         gtk_label_set_markup(self.health_condition, c_text(&badge).as_ptr());
-        let reason = measurement.and_then(|item| item.report.health_reason(&item.health));
+        let reason = measurement.and_then(|item| item.report.health_reason(&item.health, false));
         if let Some(reason) = &reason { label_text(self.health_reason, reason); }
         gtk_widget_set_visible(self.health_reason, reason.is_some().into());
         let remaining = health.and_then(|health| health.remaining);
         if let Some(percent) = remaining {
-            let text = format!("Állapot · {percent}%");
+            let text = message("Állapot · {}%", &[&percent.to_string()]);
             label_text(self.health_endurance, &text);
             gtk_progress_bar_set_fraction(self.health_bar, f64::from(percent) / 100.0);
         }
@@ -483,7 +575,7 @@ impl Desktop {
     unsafe fn add_row(&self, name: &str, value: &str) {
         let row = gtk_box_new(0, 16);
         margins(row, 9);
-        let key = label(name);
+        let key = label(tr(name));
         css(key, "dim-label");
         gtk_widget_set_hexpand(key, 1);
         gtk_box_append(row, key);
@@ -520,7 +612,7 @@ impl Desktop {
         let (sender, receiver) = mpsc::channel();
         self.job = Some(receiver);
         self.set_busy(true);
-        label_text(self.status, &format!("SMART-adatok lekérése · {path}"));
+        self.set_notice("SMART-adatok lekérése · {}", path.clone());
         thread::spawn(move || {
             let _ = sender.send(devices::read_smart_desktop(&path, adapter).map(Measurement::new));
         });
@@ -582,7 +674,7 @@ impl Desktop {
 
     unsafe fn show_last_temperature(&self) {
         let label = match &self.last_temperature {
-            Some(value) => format!("{value} (utolsó ismert)"),
+            Some(value) => message("{} (utolsó ismert)", &[value]),
             None => "–".into(),
         };
         label_text(self.temperature_label, &label);
@@ -596,6 +688,7 @@ impl Desktop {
             Err(TryRecvError::Disconnected) => Err("A SMART-lekérdezés megszakadt.".into()),
         };
         self.job = None;
+        self.notice = None;
         match result {
             Ok(measurement) => {
                 let Some(index) = self.selected_index() else { self.set_busy(false); return };
@@ -618,10 +711,10 @@ impl Desktop {
                 self.show_measurement(&measurement);
                 self.show_history();
                 if let Some(error) = save_error {
-                    label_text(self.status, &format!("A mérés nem menthető. {error}"));
+                    self.set_notice("A mérés nem menthető. {}", error.to_string());
                 }
             }
-            Err(error) => label_text(self.status, &format!("A SMART-lekérdezés sikertelen. {error}")),
+            Err(error) => self.set_notice("A SMART-lekérdezés sikertelen. {}", error.to_string()),
         }
         self.set_busy(false);
     }
@@ -629,12 +722,12 @@ impl Desktop {
     unsafe fn show_measurement(&mut self, measurement: &Measurement) {
         clear_list(self.summary);
         for (name, value) in &measurement.rows {
-            let value = value.as_deref().unwrap_or("–");
+            let value = metric(name, value.as_deref().unwrap_or("–"));
             match *name {
-                HOST_WRITTEN => label_text(self.written_label, value),
-                POWER_ON_TIME => label_text(self.power_on_time_label, value),
+                HOST_WRITTEN => label_text(self.written_label, &value),
+                POWER_ON_TIME => label_text(self.power_on_time_label, &value),
                 TEMPERATURE => (),
-                _ => self.add_row(name, value),
+                _ => self.add_row(name, &value),
             }
         }
         self.show_health(Some(measurement));
@@ -644,18 +737,36 @@ impl Desktop {
             }
         }
         self.render_tab(gtk_notebook_get_current_page(self.notebook) as usize);
+        self.show_status();
+    }
+
+    unsafe fn set_notice(&mut self, key: &'static str, detail: String) {
+        self.notice = Some((key, detail));
+        self.show_status();
+    }
+
+    unsafe fn show_status(&self) {
+        if let Some((key, detail)) = &self.notice {
+            label_text(self.status, &message(key, &[&i18n::error(detail)]));
+            return;
+        }
+        let Some(measurement) = self.measurement() else {
+            label_text(self.status, "");
+            return;
+        };
         let report = &measurement.report;
-        let mut message = format!("SMART · {} · {}", date_label(measurement.measured), report.path);
+        let mut text = format!("SMART · {} · {}", date_label(measurement.measured), report.path);
         if report.code != 0 {
-            message.push_str(&format!(" · Állapotkód: {}", report.code));
+            text.push_str(" · ");
+            text.push_str(&message("Állapotkód: {}", &[&report.code.to_string()]));
         }
         for detail in report.data["smartctl"]["messages"].as_array().into_iter().flatten() {
-            if let Some(text) = detail["string"].as_str() {
-                message.push_str(" · ");
-                message.push_str(text);
+            if let Some(detail) = detail["string"].as_str() {
+                text.push_str(" · ");
+                text.push_str(detail);
             }
         }
-        label_text(self.status, &message);
+        label_text(self.status, &text);
     }
 
     unsafe fn render_tab(&mut self, page: usize) {
@@ -688,14 +799,14 @@ impl Desktop {
         };
         let action = match action {
             Ok(action) => action,
-            Err(error) => { label_text(self.status, &error.to_string()); return }
+            Err(error) => { self.set_notice("{}", error.to_string()); return }
         };
         let (mode, accept) = if name.is_some() { (FILE_CHOOSER_SAVE, "Mentés") }
             else { (FILE_CHOOSER_OPEN, "Importálás") };
-        let dialog = gtk_file_chooser_native_new(c_text(title).as_ptr(), self.window, mode,
-            c_text(accept).as_ptr(), c_text("Mégse").as_ptr());
+        let dialog = gtk_file_chooser_native_new(c_text(tr(title)).as_ptr(), self.window, mode,
+            c_text(tr(accept)).as_ptr(), c_text(tr("Mégse")).as_ptr());
         if let Some(name) = name {
-            gtk_file_chooser_set_current_name(dialog, c_text(name).as_ptr());
+            gtk_file_chooser_set_current_name(dialog, c_text(tr(name)).as_ptr());
         }
         gtk_native_dialog_set_modal(dialog, 1);
         connect(dialog, "response", std::mem::transmute::<unsafe extern "C" fn(Object, c_int, Object), Callback>(exported), data);
@@ -709,21 +820,21 @@ impl Desktop {
             let result = export_path(dialog).and_then(|path| match action {
                 FileAction::Save(bytes) => {
                     save_file(&path, &bytes)?;
-                    Ok(format!("Mentve · {}", path.display()))
+                    Ok(("Mentve · {}", path.display().to_string()))
                 }
                 FileAction::Import => self.import_file(&path),
             });
-            let message = match result {
-                Ok(message) => message,
-                Err(error) => format!("{error}"),
+            let (key, detail) = match result {
+                Ok(notice) => notice,
+                Err(error) => ("{}", error.to_string()),
             };
-            label_text(self.status, &message);
+            self.set_notice(key, detail);
         }
         gtk_native_dialog_destroy(dialog);
         g_object_unref(dialog);
     }
 
-    unsafe fn import_file(&mut self, path: &std::path::Path) -> Result<String> {
+    unsafe fn import_file(&mut self, path: &std::path::Path) -> Result<(&'static str, String)> {
         const MAX_BYTES: u64 = 65_536;
         let Some(current) = self.measurement().and_then(|item| item.snapshot.clone()) else {
             return Err("Nincs azonosítható SMART-mérés.".into());
@@ -740,12 +851,12 @@ impl Desktop {
         if snapshot.measured == current.measured || self.history.for_drive(&snapshot.drive)
             .iter().any(|saved| saved.measured == snapshot.measured)
         {
-            return Ok("Ez a mérés már megvan.".into());
+            return Ok(("Ez a mérés már megvan.", String::new()));
         }
         self.history.save(snapshot)?;
         self.show_history();
         self.set_busy(false);
-        Ok("Mérés importálva.".into())
+        Ok(("Mérés importálva.", String::new()))
     }
 
     unsafe fn cancel_timer(&mut self) {
@@ -775,10 +886,10 @@ impl Desktop {
 fn date_label(timestamp: u64) -> String {
     unsafe {
         let date = g_date_time_new_from_unix_local((timestamp / 1_000_000_000) as i64);
-        if date.is_null() { return "Ismeretlen mérési idő".into() }
+        if date.is_null() { return tr("Ismeretlen mérési idő").into() }
         let formatted = g_date_time_format(date, c_text("%Y-%m-%d %H:%M:%S").as_ptr());
         g_date_time_unref(date);
-        if formatted.is_null() { return "Ismeretlen mérési idő".into() }
+        if formatted.is_null() { return tr("Ismeretlen mérési idő").into() }
         let result = CStr::from_ptr(formatted).to_string_lossy().into_owned();
         g_free(formatted.cast());
         result
@@ -889,6 +1000,18 @@ unsafe extern "C" fn poll(data: Object) -> c_int {
     0
 }
 
+unsafe extern "C" fn language_changed(widget: Object, data: Object) {
+    with_desktop(data, |desktop| {
+        let index = gtk_combo_box_get_active(widget);
+        if index < 0 { return }
+        let result = i18n::select(index as usize);
+        desktop.localize();
+        if let Err(error) = result {
+            desktop.set_notice("A nyelvi beállítás nem menthető. {}", error.to_string());
+        }
+    });
+}
+
 unsafe extern "C" fn adapter_changed(_: Object, data: Object) {
     with_desktop(data, |desktop| {
         desktop.temperature_generation += 1;
@@ -946,7 +1069,7 @@ pub fn run() -> Result<()> {
     unsafe {
         g_set_prgname(c_text(APP_ID).as_ptr());
         if gtk_init_check() == 0 {
-            return Err("A grafikus munkamenet nem érhető el.".into());
+            return Err(tr("A grafikus munkamenet nem érhető el.").into());
         }
         g_set_application_name(c_text("Roadmap").as_ptr());
         let provider = gtk_css_provider_new();
@@ -969,13 +1092,15 @@ pub fn run() -> Result<()> {
         let refresh_button = widget("refresh");
         let read_button = widget("read");
         let adapter = widget("adapter");
-        for name in std::iter::once("Automatikus").chain(USB_TYPES.iter().copied()) {
-            gtk_combo_box_text_append_text(adapter, c_text(name).as_ptr());
+        let language = widget("language");
+        for name in i18n::NAMES {
+            gtk_combo_box_text_append_text(language, c_text(name).as_ptr());
         }
-        gtk_combo_box_set_active(adapter, 0);
+        gtk_combo_box_set_active(language, i18n::index() as c_int);
 
         let state = RefCell::new(Desktop {
             window,
+            builder,
             disks_list,
             disk_controls: [disks_list, refresh_button, adapter],
             read_button,
@@ -1010,6 +1135,7 @@ pub fn run() -> Result<()> {
             json: widget("json"),
             spinner: widget("spinner"),
             status: widget("status"),
+            notice: None,
             disks: Vec::new(),
             disk_metrics: Vec::new(),
             measurements: HashMap::new(),
@@ -1026,11 +1152,13 @@ pub fn run() -> Result<()> {
             live_disk: None,
             timer: 0,
         });
+        state.borrow().localize_widgets();
         state.borrow_mut().show_disk();
         state.borrow_mut().refresh();
         let data = (&state as *const RefCell<Desktop>).cast_mut().cast();
         gtk_drawing_area_set_draw_func(widget("history_trend"), Some(draw_history), data, None);
         let handlers = [
+            connect(language, "changed", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(language_changed), data),
             connect(refresh_button, "clicked", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(refresh), data),
             connect(read_button, "clicked", std::mem::transmute::<unsafe extern "C" fn(Object, Object), Callback>(read), data),
             connect(disks_list, "row-selected", std::mem::transmute::<unsafe extern "C" fn(Object, Object, Object), Callback>(selected), data),
@@ -1096,7 +1224,7 @@ pub fn install() -> Result<()> {
     fs::create_dir_all(&applications)?;
     let path = applications.join(format!("{APP_ID}.desktop"));
     fs::write(&path, entry)?;
-    println!("A Roadmap elérhető az alkalmazásmenüből. {}", path.display());
+    println!("{}", message("A Roadmap elérhető az alkalmazásmenüből. {}", &[&path.display().to_string()]));
     Ok(())
 }
 

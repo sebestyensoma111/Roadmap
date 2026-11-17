@@ -21,6 +21,8 @@ use std::{
 };
 
 const ACCENT: Color = Color::Cyan;
+use crate::i18n::{self, message, tr};
+
 const VIEWS: [&str; 3] = ["1 Összefoglaló", "2 Teljes jelentés", "3 JSON"];
 type SmartJob = Receiver<Result<Report>>;
 
@@ -62,9 +64,9 @@ impl App {
         self.column = 0;
         self.error = false;
         self.status = if self.disks.is_empty() {
-            "Nincs meghajtó. Az R frissíti a listát.".into()
+            tr("Nincs meghajtó. Az R frissíti a listát.").into()
         } else {
-            "Enter – SMART-lekérdezés".into()
+            tr("Enter – SMART-lekérdezés").into()
         };
     }
 
@@ -88,7 +90,7 @@ impl App {
                 self.clear_report();
             }
             Err(error) => {
-                self.status = format!("Lista frissítése: {}", devices::clean(&error.to_string()));
+                self.status = message("Lista frissítése: {}", &[&i18n::error(&devices::clean(&error.to_string()))]);
                 self.error = true;
             }
         }
@@ -100,7 +102,7 @@ impl App {
             let adapter = self.adapter.map(|index| USB_TYPES[index]);
             let (sender, receiver) = mpsc::channel();
             self.clear_report();
-            self.status = format!("SMART-adatok lekérdezése · {path}");
+            self.status = message("SMART-adatok lekérése · {}", &[&path]);
             self.job = Some(receiver);
             thread::spawn(move || {
                 let _ = sender.send(devices::read_smart(&path, adapter));
@@ -120,15 +122,15 @@ impl App {
             Ok(report) => {
                 self.reports = [report.summary(), report.full(), report.json()];
                 if report.code == 0 {
-                    self.status = format!("SMART-jelentés · {}", report.path);
+                    self.status = message("SMART-jelentés · {}", &[&report.path]);
                 } else {
                     self.error = true;
-                    self.status = format!("SMART állapotkód: {} · {}", report.code, report.path);
+                    self.status = message("SMART állapotkód: {} · {}", &[&report.code.to_string(), &report.path]);
                 }
             }
             Err(error) => {
                 self.error = true;
-                self.status = devices::clean(&error.to_string());
+                self.status = i18n::error(&devices::clean(&error.to_string()));
             }
         }
         true
@@ -149,7 +151,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) -> (u16, u16, u16) {
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" ROADMAP ", Style::default().fg(Color::Black).bg(ACCENT).add_modifier(Modifier::BOLD)),
-            Span::raw("  Meghajtók és SMART"),
+            Span::raw(format!("  {}", tr("Meghajtók és SMART"))),
         ])),
         header,
     );
@@ -160,14 +162,14 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) -> (u16, u16, u16) {
     };
     let disks: Vec<_> = app.disks.iter().map(|disk| ListItem::new(disk.label())).collect();
     let list = List::new(disks)
-        .block(panel(" Meghajtók "))
+        .block(panel(tr("Meghajtók")))
         .highlight_symbol("› ")
         .highlight_style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD));
     frame.render_stateful_widget(list, devices, &mut app.list);
 
     let [tabs, detail] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(right);
     frame.render_widget(
-        Tabs::new(VIEWS).select(app.view)
+        Tabs::new(VIEWS.map(tr)).select(app.view)
             .highlight_style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
         tabs,
     );
@@ -180,7 +182,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) -> (u16, u16, u16) {
         partitions = app.list.selected().map(|index| {
             let disk = &app.disks[index];
             let rows: Vec<_> = disk.partitions().collect();
-            format!("{}\n\nPartíciók\n{}", disk.label(), if rows.is_empty() { "–".into() } else { rows.join("\n") })
+            format!("{}\n\n{}\n{}", disk.label(), tr("Partíciók"), if rows.is_empty() { "–".into() } else { rows.join("\n") })
         }).unwrap_or_default();
         &partitions
     };
@@ -194,7 +196,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) -> (u16, u16, u16) {
     app.offset = app.offset.min(last);
     app.column = app.column.min(rightmost);
     frame.render_widget(
-        Paragraph::new(text).block(panel(if has_report { " SMART " } else { " Meghajtóadatok " }))
+        Paragraph::new(text).block(panel(if has_report { "SMART" } else { tr("Meghajtóadatok") }))
             .scroll((app.offset, app.column)),
         detail,
     );
@@ -207,16 +209,17 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) -> (u16, u16, u16) {
     frame.render_widget(Paragraph::new(app.status.as_str()).style(Style::default().fg(status_color)), status);
     let adapter = app.adapter.map(|index| USB_TYPES[index]).unwrap_or("auto");
     frame.render_widget(
-        Paragraph::new(format!(
-            "↑↓ Meghajtó   Enter SMART   R Frissítés   Q Kilépés\nPgUp/PgDn vagy J/K Görgetés   ←→ Oldalra   U USB: {adapter}"
+        Paragraph::new(format!("{}\n{}  U USB: {adapter}",
+            tr("↑↓ Meghajtó   Enter SMART   R Frissítés   Q Kilépés"),
+            tr("PgUp/PgDn vagy J/K Görgetés   ←→ Oldalra"),
         )),
         help,
     );
     (page, last, rightmost)
 }
 
-fn panel(title: &str) -> Block<'_> {
-    Block::default().title(title).borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray))
+fn panel(title: &str) -> Block<'static> {
+    Block::default().title(format!(" {title} ")).borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray))
 }
 
 struct TerminalGuard;

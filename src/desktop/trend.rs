@@ -1,5 +1,6 @@
 use super::{c_text, sheet::{cairo_fill, cairo_move_to, cairo_rectangle, cairo_set_source_rgb}, date_label,
     gtk::Object, history::Snapshot};
+use crate::i18n::{message, tr};
 use std::ffi::{c_char, c_int};
 
 const LEFT: f64 = 102.0;
@@ -25,12 +26,13 @@ pub fn tooltip(samples: &[Snapshot], width: c_int, x: Option<c_int>) -> Option<S
         None => 0,
     };
     let sample = &samples[index];
-    let mut result = format!("{}\n{}", date_label(sample.measured), sample.condition.label());
+    let mut result = format!("{}\n{}", date_label(sample.measured), tr(sample.condition.label()));
     if let Some(remaining) = sample.remaining {
-        result.push_str(&format!(" · Állapot: {remaining}%"));
+        result.push_str(&message(" · Állapot: {}%", &[&remaining.to_string()]));
     }
     if samples.get(index + 1).is_some_and(|previous| sample.worsened_since(previous)) {
-        result.push_str("\nRomlás az előző mérés óta.");
+        result.push('\n');
+        result.push_str(tr("Romlás az előző mérés óta."));
     }
     Some(result)
 }
@@ -51,12 +53,12 @@ pub unsafe fn draw(canvas: Object, width: c_int, height: c_int, samples: &[Snaps
     cairo_rectangle(canvas, 0.0, 0.0, w, h);
     cairo_fill(canvas);
     let life_mode = samples.iter().filter(|sample| sample.remaining.is_some()).take(2).count() == 2;
-    label(if life_mode { "Állapot" } else { "SMART-kondíció" }, 14.0, 22.0, 13.0, MUTED);
+    label(tr(if life_mode { "Állapot" } else { "SMART-kondíció" }), 14.0, 22.0, 13.0, MUTED);
     if w >= 530.0 {
         color(AMBER);
-        cairo_arc(canvas, w - 119.0, 17.5, 3.5, 0.0, std::f64::consts::TAU);
+        cairo_arc(canvas, w - 155.0, 17.5, 3.5, 0.0, std::f64::consts::TAU);
         cairo_fill(canvas);
-        label("Jelzett romlás", w - 109.0, 22.0, 12.0, AMBER);
+        label(tr("Jelzett romlás"), w - 145.0, 22.0, 12.0, AMBER);
     }
     let top = 40.0;
     let bottom = h - 28.0;
@@ -69,7 +71,7 @@ pub unsafe fn draw(canvas: Object, width: c_int, height: c_int, samples: &[Snaps
     let ticks = if life_mode {
         [upper, (upper + lower) / 2, lower].map(|tick| format!("{tick}%"))
     } else {
-        ["Jó", "Figyelmeztetés", "Kritikus"].map(str::to_string)
+        ["Jó", "Figyelmeztetés", "Kritikus"].map(|text| tr(text).to_string())
     };
     for (index, text) in ticks.iter().enumerate() {
         let y = top + (bottom - top) * index as f64 / 2.0;

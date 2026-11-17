@@ -1,3 +1,4 @@
+use crate::i18n::{message, tr};
 use super::data_home;
 use crate::devices::{Condition, Disk, Health, Result, HOST_READ, HOST_WRITTEN, POWER_ON_TIME, TEMPERATURE};
 use serde::{Deserialize, Serialize};
@@ -142,17 +143,17 @@ impl Snapshot {
                 after.checked_sub(before).filter(|value| *value > 0)
             };
             let text = match change.field {
-                "Kondíció" => format!("Új állapot: {}.", change.after),
-                "Állapot" => format!("Az állapot most {}.", change.after),
-                POWER_ON_TIME => format!("{} órával többet üzemelt.", growth(" óra")?),
-                HOST_WRITTEN => format!("Az összes írt adat most {}.", change.after),
-                "Függőben lévő szektorok" => format!("{} szektorral több vár ellenőrzésre.", growth("")?),
-                "Áthelyezett szektorok" => format!("{} új áthelyezett szektor.", growth("")?),
-                "NVMe médiahibák" => format!("{} új médiahiba.", growth("")?),
-                "Javíthatatlan ATA szektorok" => format!("{} új javíthatatlan szektor.", growth("")?),
-                "SCSI utólagos hibák" => format!("{} újonnan észlelt lemezhiba.", growth("")?),
-                "SCSI javíthatatlan olvasási hibák" => format!("{} új javíthatatlan olvasási hiba.", growth("")?),
-                "SCSI javíthatatlan írási hibák" => format!("{} új javíthatatlan írási hiba.", growth("")?),
+                "Kondíció" => message("Új állapot: {}.", &[tr(&change.after)]),
+                "Állapot" => message("Az állapot most {}.", &[tr(&change.after)]),
+                POWER_ON_TIME => message("{} órával többet üzemelt.", &[&growth(" óra")?.to_string()]),
+                HOST_WRITTEN => message("Az összes írt adat most {}.", &[tr(&change.after)]),
+                "Függőben lévő szektorok" => message("{} szektorral több vár ellenőrzésre.", &[&growth("")?.to_string()]),
+                "Áthelyezett szektorok" => message("{} új áthelyezett szektor.", &[&growth("")?.to_string()]),
+                "NVMe médiahibák" => message("{} új médiahiba.", &[&growth("")?.to_string()]),
+                "Javíthatatlan ATA szektorok" => message("{} új javíthatatlan szektor.", &[&growth("")?.to_string()]),
+                "SCSI utólagos hibák" => message("{} újonnan észlelt lemezhiba.", &[&growth("")?.to_string()]),
+                "SCSI javíthatatlan olvasási hibák" => message("{} új javíthatatlan olvasási hiba.", &[&growth("")?.to_string()]),
+                "SCSI javíthatatlan írási hibák" => message("{} új javíthatatlan írási hiba.", &[&growth("")?.to_string()]),
                 _ => return None,
             };
             Some((text, change.warning))

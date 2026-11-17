@@ -1,3 +1,4 @@
+use crate::i18n::{message, tr};
 use super::{c_text, gtk::{g_object_unref, Object}};
 use crate::devices::{Condition, Result};
 use std::{ffi::{c_char, c_int, c_uint}, slice};
@@ -59,8 +60,8 @@ pub fn render(sheet: &Sheet<'_>) -> Result<Vec<u8>> {
             f64::from(height) / 1024.0
         };
 
-        text("Mérési lap", "Sans Bold 20", MARGIN, 18.0, CONTENT_WIDTH, 1, ink);
-        text(&format!("Mérés ideje: {}", sheet.measured), "Sans 9", MARGIN, 52.0, CONTENT_WIDTH, 1, muted);
+        text(tr("Mérési lap"), "Sans Bold 20", MARGIN, 18.0, CONTENT_WIDTH, 1, ink);
+        text(&message("Mérés ideje: {}", &[sheet.measured]), "Sans 9", MARGIN, 52.0, CONTENT_WIDTH, 1, muted);
         rect(MARGIN, 76.0, CONTENT_WIDTH, 1.0, (0.85, 0.88, 0.90));
 
         let model_height = text(sheet.model, "Sans Bold 15", MARGIN, 90.0, CONTENT_WIDTH, 2, ink);
@@ -74,13 +75,13 @@ pub fn render(sheet: &Sheet<'_>) -> Result<Vec<u8>> {
         if !sheet.metrics.is_empty() { top += 12.0; }
         for &(name, value) in sheet.metrics {
             rect(MARGIN, top, CONTENT_WIDTH, 1.0, (0.88, 0.90, 0.92));
-            text(name, "Sans 9", MARGIN, top + 8.0, 158.0, 1, muted);
+            text(tr(name), "Sans 9", MARGIN, top + 8.0, 158.0, 1, muted);
             text(value, "Sans Bold 10", MARGIN + 170.0, top + 7.0, CONTENT_WIDTH - 170.0, 1, ink);
             top += 30.0;
         }
         if let Some(serial) = sheet.serial {
             top += 8.0;
-            top += text(&format!("Sorozatszám: {serial}"), "Sans 9", MARGIN, top, CONTENT_WIDTH, 2, muted);
+            top += text(&message("Sorozatszám: {}", &[serial]), "Sans 9", MARGIN, top, CONTENT_WIDTH, 2, muted);
         }
 
         g_object_unref(layout);

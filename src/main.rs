@@ -1,4 +1,5 @@
 mod devices;
+mod i18n;
 mod ui;
 #[cfg(feature = "desktop")]
 mod desktop;
@@ -7,7 +8,7 @@ use devices::Result;
 use std::{env, process::ExitCode};
 
 fn usage() {
-    println!("Roadmap · Linux SMART-lekérdezés\n\n  roadmap\n  roadmap list\n  roadmap smart ESZKÖZ [--full | --json] [--type USB-TÍPUS]");
+    println!("Roadmap · {}\n\n  roadmap\n  roadmap list\n  roadmap smart {} [--full | --json] [--type {}]", i18n::tr("Linux SMART-lekérdezés"), i18n::tr("ESZKÖZ"), i18n::tr("USB-TÍPUS"));
     #[cfg(feature = "desktop")]
     println!("  roadmap --gui\n  roadmap --install-desktop");
 }
@@ -39,7 +40,7 @@ fn run() -> Result<u8> {
                     "--type" if adapter.is_none() => {
                         adapter = Some(options.next().ok_or("A --type kapcsolóhoz USB-típus szükséges.")?);
                     }
-                    _ => return Err(format!("Ismeretlen vagy ismételt kapcsoló: {option}").into()),
+                    _ => return Err(i18n::message("Ismeretlen vagy ismételt kapcsoló: {}", &[option]).into()),
                 }
             }
             let report = devices::read_smart(&args[1], adapter)?;
@@ -57,10 +58,11 @@ fn run() -> Result<u8> {
 }
 
 fn main() -> ExitCode {
+    i18n::load();
     match run() {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
-            eprintln!("Hiba: {}", devices::clean(&error.to_string()));
+            eprintln!("{}", i18n::message("Hiba: {}", &[&i18n::error(&devices::clean(&error.to_string()))]));
             ExitCode::FAILURE
         }
     }

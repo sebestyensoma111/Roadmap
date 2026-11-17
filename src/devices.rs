@@ -60,7 +60,7 @@ impl Disk {
             self.path,
             self.capacity_label(),
             self.tran.as_deref().unwrap_or("–"),
-            clean(self.model.as_deref().unwrap_or("ismeretlen modell").trim()),
+            clean(self.model.as_deref().unwrap_or_else(|| crate::i18n::tr("ismeretlen modell")).trim()),
         )
     }
 
@@ -318,11 +318,11 @@ impl Report {
                 ("scsi_error_counter_log", "SCSI hibaszámlálók"), ("scsi_self_test_log", "SCSI öntesztnapló"),
             ] {
                 if let Some(value) = self.data.get(key) {
-                    sections.push(format!("{label}\n{}", serde_json::to_string_pretty(value).unwrap_or_default()));
+                    sections.push(format!("{}\n{}", crate::i18n::tr(label), serde_json::to_string_pretty(value).unwrap_or_default()));
                 }
             }
         }
-        if sections.is_empty() { "A meghajtó jelentésében nincs elérhető hiba- vagy öntesztnapló.".into() }
+        if sections.is_empty() { crate::i18n::tr("A meghajtó jelentésében nincs elérhető hiba- vagy öntesztnapló.").into() }
         else { sections.join("\n\n") }
     }
 
@@ -345,14 +345,14 @@ impl Report {
                 && item["flags"]["normalized"].as_bool() != Some(true))
             .find_map(|item| count(&item["value"]));
         [
-            ("függőben lévő szektor", count(&self.data["ata_pending_defects_log"]["count"])
+            ("{} függőben lévő szektor", count(&self.data["ata_pending_defects_log"]["count"])
                 .or_else(|| attribute("Current_Pending_Sector"))
                 .or_else(|| statistic("Number of Realloc. Candidate Logical Sectors"))),
-            ("áthelyezett szektor", attribute("Reallocated_Sector_Ct")
+            ("{} áthelyezett szektor", attribute("Reallocated_Sector_Ct")
                 .or_else(|| statistic("Number of Reallocated Logical Sectors"))),
-            ("javíthatatlan szektor", attribute("Offline_Uncorrectable")),
-            ("javíthatatlan hiba", statistic("Number of Reported Uncorrectable Errors")),
-            ("NVMe médiahiba", count(&self.data["nvme_smart_health_information_log"]["media_errors"])),
+            ("{} javíthatatlan szektor", attribute("Offline_Uncorrectable")),
+            ("{} javíthatatlan hiba", statistic("Number of Reported Uncorrectable Errors")),
+            ("{} NVMe médiahiba", count(&self.data["nvme_smart_health_information_log"]["media_errors"])),
         ].into_iter().find_map(|(label, count)| Some((label, count?)))
     }
 
@@ -362,10 +362,10 @@ impl Report {
     }
 
     #[cfg(feature = "desktop")]
-    pub fn health_reason(&self, health: &Health) -> Option<String> {
+    pub fn health_reason(&self, health: &Health, for_sheet: bool) -> Option<String> {
         match health.condition {
             Condition::Critical => Some(self.nvme_critical_flags().map_or_else(
-                || "A meghajtó SMART-hibát jelez.".into(),
+                || crate::i18n::tr("A meghajtó SMART-hibát jelez.").into(),
                 |flags| {
                     let mut reasons = [
                         "Kevés tartalékkapacitás",
@@ -375,17 +375,24 @@ impl Report {
                         "A felejtő memória mentése hibás",
                         "A tartós memóriaterület csak olvasható vagy megbízhatatlan",
                     ].into_iter().enumerate().filter_map(|(bit, reason)| {
-                        (flags & (1 << bit) != 0).then(|| reason.to_string())
+                        (flags & (1 << bit) != 0).then(|| crate::i18n::tr(reason).to_string())
                     }).collect::<Vec<_>>();
                     let unknown = flags & !0x3f;
                     if unknown != 0 {
-                        reasons.push(format!("Ismeretlen NVMe-jelzés · 0x{unknown:02X}"));
+                        reasons.push(crate::i18n::message("Ismeretlen NVMe-jelzés · {}", &[&format!("0x{unknown:02X}")]));
                     }
                     reasons.join(" · ")
                 },
             )),
-            Condition::MediaWarnings => self.media_issue().map(|(label, count)| format!("{count} {label}")),
-            Condition::LowEndurance => Some("Alacsony hátralévő élettartam.".into()),
+            Condition::MediaWarnings => self.media_issue().map(|(label, count)| {
+                let key = if for_sheet && label == "{} függőben lévő szektor" {
+                    "{} lemezterület ellenőrzésre vár."
+                } else {
+                    label
+                };
+                crate::i18n::message(key, &[&count.to_string()])
+            }),
+            Condition::LowEndurance => Some(crate::i18n::tr("Alacsony hátralévő élettartam.").into()),
             _ => None,
         }
     }
@@ -553,16 +560,16 @@ impl Report {
     pub fn summary(&self) -> String {
         let health = self.health();
         let remaining = health.remaining.map(|value| format!("{value}%"))
-            .unwrap_or_else(|| "Nem érhető el".into());
+            .unwrap_or_else(|| crate::i18n::tr("Nem érhető el").into());
         let mut lines = vec![
-            format!("{:36} {}", "Kondíció", health.condition.label()),
-            format!("{:36} {remaining}", "Állapot"),
+            format!("{:36} {}", crate::i18n::tr("Kondíció"), crate::i18n::tr(health.condition.label())),
+            format!("{:36} {remaining}", crate::i18n::tr("Állapot")),
             String::new(),
         ];
         lines.extend(self.rows().into_iter()
-            .map(|(label, value)| format!("{label:36} {}", value.as_deref().unwrap_or("–"))));
+            .map(|(label, value)| format!("{:36} {}", crate::i18n::tr(label), crate::i18n::metric(label, value.as_deref().unwrap_or("–")))));
         if self.code != 0 {
-            lines.push(format!("\nSMART állapotkód: {}", self.code));
+            lines.push(format!("\n{}", crate::i18n::message("SMART állapotkód: {}", &[&self.code.to_string()])));
         }
         for message in self.data["smartctl"]["messages"].as_array().into_iter().flatten() {
             if let Some(message) = text(&message["string"]) {
@@ -591,12 +598,12 @@ mod tests {
             }),
             code: 0, path: String::new(), disk: None,
         };
-        assert_eq!(report.health_reason(&report.health()).as_deref(), Some("3 függőben lévő szektor"));
+        assert_eq!(report.health_reason(&report.health(), false).as_deref(), Some("3 függőben lévő szektor"));
         let nvme = Report {
             data: json!({"nvme_smart_health_information_log": {"critical_warning": {"value": 10}}}),
             code: 0, path: String::new(), disk: None,
         };
-        assert_eq!(nvme.health_reason(&nvme.health()).as_deref(),
+        assert_eq!(nvme.health_reason(&nvme.health(), false).as_deref(),
             Some("Hőmérséklet a határértéken kívül · A meghajtó csak olvasható"));
     }
 
