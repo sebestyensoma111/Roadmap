@@ -15,11 +15,13 @@ Válassz meghajtót a bal oldali listában, majd kattints a **SMART lekérése**
 
 A kiválasztott meghajtó hőfoka a neve alatt jelenik meg és öt másodpercenként frissül, amíg az ablak nyitva van. A Roadmap a Linux hőfokszenzorát vagy normál jogosultságú SMART-lekérdezést használ. Ha az élő érték nem érhető el, az utolsó ismert hőfokot külön megjelöli, és 30 másodperc múlva próbálkozik újra. A meghajtólistában a legutóbbi SMART-mérés állapota és időpontja is látható.
 
-A **Pillanatkép mentése** gomb meghajtónként menti a lekért fő adatokat a `$XDG_DATA_HOME/roadmap/history` mappába. Az alapértelmezett hely a `~/.local/share/roadmap/history`. A következő SMART-lekéréskor az előző mentéshez képest látható, mely értékek változtak. A növekvő hibaszámlálók külön jelzést kapnak, ha mindkét mérés közli a számlálót. Az **Előzmények** fülön az utolsó 50 mentés látható.
+A **SMART lekérése** után a Roadmap automatikusan menti az azonosítható meghajtó mérését a `$XDG_DATA_HOME/roadmap/history` mappába. Az alapértelmezett hely a `~/.local/share/roadmap/history`. Az **Előzmények** grafikonján az utolsó 50 mérés alakulása látszik. Ha van elegendő százalékos adat, a becsült hátralévő élettartam jelenik meg, egyébként a SMART-kondíció. A narancssárga pont romlást jelöl az előző méréshez képest, az egérmutatónál megjelenik a dátum. Két mentés a grafikon alatt külön összehasonlítható.
 
-A **Naplók** fül a meghajtó jelentésében szereplő hiba- és öntesztnaplókat jeleníti meg. A **Jelentés mentése…** szövegfájlt készít a választott helyen. Az exportban a sorozatszám alapból rejtett, a meglévő fájlok felülírása helyett új fájlnevet kér.
+Az **Előzmények** fülön exportálható az aktuális mérés. Másik gépen ugyanarról a meghajtóról kérj friss SMART-adatokat, majd importáld a JSON-fájlt. A sorozatszám és a kapacitás alapján kapcsolódik az előzmény a meghajtóhoz.
 
-A meghajtó neve alatt színes jelző mutatja a SMART-kondíciót. A zöld megfelelő állapotot, a sárga adathordozó-hibákat vagy legfeljebb 10% hátralévő élettartamot, a piros kritikus SMART-jelzést, a szürke hiányzó állapotadatot jelent. A százaléksáv az SSD által közölt kopásadatból számolt, becsült hátralévő névleges élettartamot mutatja. HDD-knél és kopásadat nélküli SSD-knél a kondíciójelző mellé a százalék hiánya kerül.
+A **Mérési lap mentése…** egy tömör PNG-képet készít a mérés legfontosabb adataival. A sorozatszám alapból rejtett. A **Naplók** fül a meghajtó hiba- és öntesztnaplóit jeleníti meg.
+
+A meghajtó neve alatt egy sorban látható a kondíció, a hőfok, az üzemóra és a teljes írt adatmennyiség. Figyelmeztetésnél külön sor mutatja az okot. A zöld megfelelő állapotot, a sárga adathordozó-hibákat vagy legfeljebb 10% hátralévő élettartamot, a piros kritikus SMART-jelzést, a szürke hiányzó állapotadatot jelent. A százaléksáv az SSD által közölt kopásadatból számolt, becsült hátralévő névleges élettartamot mutatja.
 
 Az alkalmazásmenü-bejegyzés és a Roadmap ikon telepítéséhez futtasd az alábbi parancsot. A menüpont a lefordított program jelenlegi elérési útjára mutat.
 
@@ -52,3 +54,14 @@ sudo ./target/release/roadmap smart /dev/sdX --type sat --full
 ```
 
 A program műveletei a meghajtók listázására és a SMART-jelentések kiolvasására korlátozódnak. A `smart` parancs érvényes jelentés esetén a `smartctl` státuszkódját adja vissza. Részben elérhető jelentésnél is megjeleníti a kapott adatokat.
+
+## Tesztek és CI
+
+A tesztek mintajelentésekkel futnak, ezért meghajtó és rendszergazdai jog nélkül is elindíthatók.
+
+```bash
+cargo test --locked --all-targets
+cargo test --locked --all-targets --no-default-features
+```
+
+A GitHub Actions minden pushnál és pull requestnél futtatja mindkét tesztváltozatot, majd elkészíti a release buildet Rust 1.75.0-val és az aktuális stabil verzióval.

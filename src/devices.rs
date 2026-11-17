@@ -332,6 +332,64 @@ impl Report {
             .filter(|field| field["flags"]["valid"].as_bool() != Some(false))
     }
 
+    fn media_issue(&self) -> Option<(&'static str, u128)> {
+        let count = |value: &Value| number(value).filter(|count| *count > 0);
+        let attributes = self.data["ata_smart_attributes"]["table"].as_array();
+        let attribute = |name| {
+            attributes.into_iter().flatten()
+                .filter(|item| item["name"].as_str() == Some(name))
+                .find_map(|item| count(&item["raw"]["value"]))
+        };
+        let statistic = |name| self.ata_statistics()
+            .filter(|item| item["name"].as_str() == Some(name)
+                && item["flags"]["normalized"].as_bool() != Some(true))
+            .find_map(|item| count(&item["value"]));
+        [
+            ("függőben lévő szektor", count(&self.data["ata_pending_defects_log"]["count"])
+                .or_else(|| attribute("Current_Pending_Sector"))
+                .or_else(|| statistic("Number of Realloc. Candidate Logical Sectors"))),
+            ("áthelyezett szektor", attribute("Reallocated_Sector_Ct")
+                .or_else(|| statistic("Number of Reallocated Logical Sectors"))),
+            ("javíthatatlan szektor", attribute("Offline_Uncorrectable")),
+            ("javíthatatlan hiba", statistic("Number of Reported Uncorrectable Errors")),
+            ("NVMe médiahiba", count(&self.data["nvme_smart_health_information_log"]["media_errors"])),
+        ].into_iter().find_map(|(label, count)| Some((label, count?)))
+    }
+
+    fn nvme_critical_flags(&self) -> Option<u128> {
+        let warning = &self.data["nvme_smart_health_information_log"]["critical_warning"];
+        number(warning).or_else(|| number(&warning["value"])).filter(|flags| *flags != 0)
+    }
+
+    #[cfg(feature = "desktop")]
+    pub fn health_reason(&self, health: &Health) -> Option<String> {
+        match health.condition {
+            Condition::Critical => Some(self.nvme_critical_flags().map_or_else(
+                || "A meghajtó SMART-hibát jelez.".into(),
+                |flags| {
+                    let mut reasons = [
+                        "Kevés tartalékkapacitás",
+                        "Hőmérséklet a határértéken kívül",
+                        "Csökkent megbízhatóság",
+                        "A meghajtó csak olvasható",
+                        "A felejtő memória mentése hibás",
+                        "A tartós memóriaterület csak olvasható vagy megbízhatatlan",
+                    ].into_iter().enumerate().filter_map(|(bit, reason)| {
+                        (flags & (1 << bit) != 0).then(|| reason.to_string())
+                    }).collect::<Vec<_>>();
+                    let unknown = flags & !0x3f;
+                    if unknown != 0 {
+                        reasons.push(format!("Ismeretlen NVMe-jelzés · 0x{unknown:02X}"));
+                    }
+                    reasons.join(" · ")
+                },
+            )),
+            Condition::MediaWarnings => self.media_issue().map(|(label, count)| format!("{count} {label}")),
+            Condition::LowEndurance => Some("Alacsony hátralévő élettartam.".into()),
+            _ => None,
+        }
+    }
+
     pub fn health(&self) -> Health {
         let nvme = &self.data["nvme_smart_health_information_log"];
         let attributes = self.data["ata_smart_attributes"]["table"].as_array();
@@ -351,25 +409,10 @@ impl Report {
                 ata_value(&["Percent_Lifetime_Remain", "SSD_Life_Left", "Remaining_Lifetime_Perc"], "/value")
                     .filter(|value| *value <= 100).map(|value| value as u8)
             });
-        let has_count = |value: &Value| number(value).is_some_and(|count| count > 0);
-        let media_warning = has_count(&nvme["media_errors"])
-            || has_count(&self.data["ata_pending_defects_log"]["count"])
-            || attributes.into_iter().flatten().any(|attribute| {
-                matches!(attribute["name"].as_str(), Some("Reallocated_Sector_Ct"
-                    | "Current_Pending_Sector" | "Offline_Uncorrectable"))
-                    && has_count(&attribute["raw"]["value"])
-            })
-            || self.ata_statistics().any(|field| {
-                matches!(field["name"].as_str(), Some("Number of Reallocated Logical Sectors"
-                    | "Number of Realloc. Candidate Logical Sectors" | "Number of Reported Uncorrectable Errors"))
-                    && field["flags"]["normalized"].as_bool() != Some(true)
-                    && has_count(&field["value"])
-            });
         let passed = self.data["smart_status"]["passed"].as_bool();
-        let critical = &nvme["critical_warning"];
-        let condition = if passed == Some(false) || has_count(critical) || has_count(&critical["value"]) {
+        let condition = if passed == Some(false) || self.nvme_critical_flags().is_some() {
             Condition::Critical
-        } else if media_warning {
+        } else if self.media_issue().is_some() {
             Condition::MediaWarnings
         } else if remaining.is_some_and(|value| value <= 10) {
             Condition::LowEndurance
@@ -513,7 +556,7 @@ impl Report {
             .unwrap_or_else(|| "Nem érhető el".into());
         let mut lines = vec![
             format!("{:36} {}", "Kondíció", health.condition.label()),
-            format!("{:36} {remaining}", "Becsült hátralévő élettartam"),
+            format!("{:36} {remaining}", "Állapot"),
             String::new(),
         ];
         lines.extend(self.rows().into_iter()
@@ -535,11 +578,78 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg(feature = "desktop")]
+    #[test]
+    fn dashboard_shows_the_reported_reason_for_a_warning() {
+        let report = Report {
+            data: json!({
+                "smart_status": {"passed": true},
+                "ata_smart_attributes": {"table": [
+                    {"name": "Reallocated_Sector_Ct", "raw": {"value": 4}},
+                    {"name": "Current_Pending_Sector", "raw": {"value": 3}}
+                ]}
+            }),
+            code: 0, path: String::new(), disk: None,
+        };
+        assert_eq!(report.health_reason(&report.health()).as_deref(), Some("3 függőben lévő szektor"));
+        let nvme = Report {
+            data: json!({"nvme_smart_health_information_log": {"critical_warning": {"value": 10}}}),
+            code: 0, path: String::new(), disk: None,
+        };
+        assert_eq!(nvme.health_reason(&nvme.health()).as_deref(),
+            Some("Hőmérséklet a határértéken kívül · A meghajtó csak olvasható"));
+    }
+
     #[test]
     fn host_totals_switch_to_terabytes_at_one_terabyte() {
         assert_eq!(host_amount(512_500_000_000), "512.50 GB");
         assert_eq!(host_amount(1_000_000_000_000), "1.000 TB");
         assert_eq!(host_amount(1_250_000_000_000), "1.250 TB");
+    }
+
+    #[test]
+    fn nvme_totals_use_data_units_and_prefer_precise_counters() {
+        let report = Report {
+            data: json!({
+                "nvme_smart_health_information_log": {
+                    "data_units_written": 1,
+                    "data_units_written_s": "1953125",
+                    "data_units_read": 1_000_000,
+                    "power_on_hours": 123,
+                    "temperature": 34
+                }
+            }),
+            code: 0,
+            path: String::new(),
+            disk: None,
+        };
+        let rows = report.rows();
+        let field = |key| rows.iter().find(|(name, _)| *name == key).unwrap().1.as_deref();
+        assert_eq!(field(HOST_WRITTEN), Some("1.000 TB"));
+        assert_eq!(field(HOST_READ), Some("512.00 GB"));
+        assert_eq!(field(POWER_ON_TIME), Some("123 óra"));
+        assert_eq!(field(TEMPERATURE), Some("34 °C"));
+    }
+
+    #[test]
+    fn ata_totals_skip_invalid_stats_and_use_the_reported_sector_size() {
+        let report = Report {
+            data: json!({
+                "logical_block_size": 4096,
+                "ata_device_statistics": {"pages": [{"table": [
+                    {"name": "Logical Sectors Written", "value": 3, "flags": {"valid": false}},
+                    {"name": "Logical Sectors Written", "value": 4, "flags": {"normalized": true}},
+                    {"name": "Logical Sectors Written", "value": 125_000_000}
+                ]}]}
+            }),
+            code: 0,
+            path: String::new(),
+            disk: None,
+        };
+        let rows = report.rows();
+        let field = |key| rows.iter().find(|(name, _)| *name == key).unwrap().1.as_deref();
+        assert_eq!(field(HOST_WRITTEN), Some("512.00 GB"));
+        assert_eq!(field(HOST_READ), None);
     }
 
     #[cfg(feature = "desktop")]

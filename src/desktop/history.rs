@@ -25,6 +25,9 @@ pub struct DriveId {
 }
 
 impl DriveId {
+    pub fn matches_drive(&self, other: &Self) -> bool {
+        self.serial == other.serial && self.size != 0 && self.size == other.size
+    }
     pub fn from_disk(disk: &Disk) -> Option<Self> {
         Self::new(disk.serial.as_deref()?, disk.model.as_deref().unwrap_or_default(), disk.size)
     }
@@ -49,12 +52,72 @@ pub struct Snapshot {
     pub values: BTreeMap<String, String>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct PortableMeasurement {
+    version: u8,
+    measurement: Snapshot,
+}
+
+pub struct Difference {
+    pub field: &'static str,
+    pub before: String,
+    pub after: String,
+    pub warning: bool,
+}
+
 pub fn now() -> u64 {
     u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos())
         .unwrap_or(u64::MAX)
 }
 
 impl Snapshot {
+    pub fn severity(&self) -> Option<u8> {
+        match self.condition {
+            Condition::Passed => Some(0),
+            Condition::MediaWarnings | Condition::LowEndurance => Some(1),
+            Condition::Critical => Some(2),
+            Condition::Unavailable => None,
+        }
+    }
+
+    pub fn worsened_since(&self, previous: &Self) -> bool {
+        matches!((previous.severity(), self.severity()), (Some(old), Some(new)) if new > old)
+            || matches!((previous.remaining, self.remaining), (Some(old), Some(new)) if new < old)
+            || ERROR_FIELDS.iter().any(|field| {
+                let value = |sample: &Self| sample.values.get(*field).and_then(|value| value.parse::<u128>().ok());
+                matches!((value(previous), value(self)), (Some(old), Some(new)) if new > old)
+            })
+    }
+    pub fn portable(&self) -> Result<Vec<u8>> {
+        if self.drive.size == 0 {
+            return Err("A méréshez hiányzik a meghajtó kapacitása.".into());
+        }
+        Ok(serde_json::to_vec_pretty(&PortableMeasurement { version: 1, measurement: self.clone() })?)
+    }
+
+    pub fn from_portable(bytes: &[u8], current: &Self) -> Result<Self> {
+        let file: PortableMeasurement = serde_json::from_slice(bytes)
+            .map_err(|_| "Érvénytelen Roadmap-mérés.")?;
+        if file.version != 1 {
+            return Err("A mérés fájlverziója nem támogatott.".into());
+        }
+        let mut sample = file.measurement;
+        if !sample.drive.matches_drive(&current.drive) {
+            return Err("A fájl másik meghajtóhoz tartozik.".into());
+        }
+        if sample.measured == 0 || sample.remaining.is_some_and(|value| value > 100)
+            || sample.values.iter().any(|(field, value)| {
+                !(ERROR_FIELDS.contains(&field.as_str()) || MEASUREMENT_FIELDS.contains(&field.as_str()))
+                    || value.len() > 96 || value.chars().any(char::is_control)
+            })
+            || (sample.values.is_empty() && sample.remaining.is_none() && sample.condition == Condition::Unavailable)
+        {
+            return Err("A mérés adatai érvénytelenek.".into());
+        }
+        sample.drive = current.drive.clone();
+        Ok(sample)
+    }
+
     pub fn new(drive: DriveId, measured: u64, health: &Health, rows: &[(&str, Option<String>)]) -> Self {
         let values = rows.iter().filter_map(|(label, value)| {
             if !ERROR_FIELDS.contains(label) && !MEASUREMENT_FIELDS.contains(label) {
@@ -72,30 +135,60 @@ impl Snapshot {
     }
 
     pub fn changes(&self, previous: &Self) -> Vec<(String, bool)> {
-        let mut changes = Vec::new();
-        if self.condition != previous.condition && self.condition != Condition::Unavailable
-            && previous.condition != Condition::Unavailable {
-            changes.push((format!("Kondíció: {} → {}", previous.condition.label(), self.condition.label()),
-                matches!(self.condition, Condition::Critical | Condition::MediaWarnings | Condition::LowEndurance)));
-        }
-        if let (Some(before), Some(after)) = (previous.remaining, self.remaining) {
-            if before != after {
-                changes.push((format!("Hátralévő élettartam: {before}% → {after}%"), after < before && after <= 10));
+        self.comparison(previous, false).into_iter().filter_map(|change| {
+            let growth = |unit: &str| {
+                let before: u128 = change.before.trim_end_matches(unit).parse().ok()?;
+                let after: u128 = change.after.trim_end_matches(unit).parse().ok()?;
+                after.checked_sub(before).filter(|value| *value > 0)
+            };
+            let text = match change.field {
+                "Kondíció" => format!("Új állapot: {}.", change.after),
+                "Állapot" => format!("Az állapot most {}.", change.after),
+                POWER_ON_TIME => format!("{} órával többet üzemelt.", growth(" óra")?),
+                HOST_WRITTEN => format!("Az összes írt adat most {}.", change.after),
+                "Függőben lévő szektorok" => format!("{} szektorral több vár ellenőrzésre.", growth("")?),
+                "Áthelyezett szektorok" => format!("{} új áthelyezett szektor.", growth("")?),
+                "NVMe médiahibák" => format!("{} új médiahiba.", growth("")?),
+                "Javíthatatlan ATA szektorok" => format!("{} új javíthatatlan szektor.", growth("")?),
+                "SCSI utólagos hibák" => format!("{} újonnan észlelt lemezhiba.", growth("")?),
+                "SCSI javíthatatlan olvasási hibák" => format!("{} új javíthatatlan olvasási hiba.", growth("")?),
+                "SCSI javíthatatlan írási hibák" => format!("{} új javíthatatlan írási hiba.", growth("")?),
+                _ => return None,
+            };
+            Some((text, change.warning))
+        }).collect()
+    }
+
+    pub fn comparison(&self, previous: &Self, show_all: bool) -> Vec<Difference> {
+        let mut rows = Vec::new();
+        let mut add = |field, before: Option<String>, after: Option<String>, warning| {
+            let changed = matches!((&before, &after), (Some(before), Some(after)) if before != after);
+            if changed || (show_all && (before.is_some() || after.is_some())) {
+                rows.push(Difference {
+                    field,
+                    before: before.unwrap_or_else(|| "–".into()),
+                    after: after.unwrap_or_else(|| "–".into()),
+                    warning: changed && warning,
+                });
             }
+        };
+        let condition = |condition: Condition| (condition != Condition::Unavailable).then(|| condition.label().into());
+        add("Kondíció", condition(previous.condition), condition(self.condition), matches!(
+            self.condition, Condition::Critical | Condition::MediaWarnings | Condition::LowEndurance
+        ));
+        add("Állapot",
+            previous.remaining.map(|value| format!("{value}%")), self.remaining.map(|value| format!("{value}%")),
+            matches!((previous.remaining, self.remaining), (Some(before), Some(after)) if after < before && after <= 10));
+        for &field in ERROR_FIELDS.iter().chain(MEASUREMENT_FIELDS) {
+            let before = previous.values.get(field);
+            let after = self.values.get(field);
+            let count = |value: Option<&String>| value.and_then(|value| value.parse::<u128>().ok());
+            let increased = ERROR_FIELDS.contains(&field)
+                && matches!((count(before), count(after)), (Some(before), Some(after)) if after > before);
+            add(field, before.cloned(), after.cloned(), increased);
         }
-        for field in ERROR_FIELDS.iter().chain(MEASUREMENT_FIELDS) {
-            let (Some(before), Some(after)) = (previous.values.get(*field), self.values.get(*field)) else { continue };
-            if before == after { continue }
-            let increased = if ERROR_FIELDS.contains(field) {
-                match (before.parse::<u128>(), after.parse::<u128>()) {
-                    (Ok(before), Ok(after)) => after > before,
-                    _ => false,
-                }
-            } else { false };
-            changes.push((format!("{field}: {before} → {after}"), increased));
-        }
-        changes.sort_by_key(|(_, warning)| !warning);
-        changes
+        rows.sort_by_key(|row| !row.warning);
+        rows
     }
 }
 
@@ -181,9 +274,76 @@ mod tests {
     fn warnings_require_an_increase_in_a_comparable_error_counter() {
         let first = snapshot("01A", 1, Some("2"));
         let second = snapshot("01A", 2, Some("8"));
-        assert_eq!(second.changes(&first), vec![("NVMe médiahibák: 2 → 8".into(), true)]);
-        assert_eq!(first.changes(&second), vec![("NVMe médiahibák: 8 → 2".into(), false)]);
+        assert_eq!(second.changes(&first), vec![("6 új médiahiba.".into(), true)]);
+        assert!(first.changes(&second).is_empty());
         assert!(snapshot("01A", 3, None).changes(&second).is_empty());
+        assert!(second.worsened_since(&first));
+        assert!(!first.worsened_since(&second));
+        assert!(!second.worsened_since(&snapshot("01A", 1, None)));
+    }
+
+    #[test]
+    fn trend_marks_wear_and_condition_declines_without_inventing_unknown_status() {
+        let mut first = snapshot("01A", 1, None);
+        first.remaining = Some(95);
+        let mut second = first.clone();
+        second.remaining = Some(94);
+        assert!(second.worsened_since(&first));
+        second.remaining = None;
+        second.condition = Condition::Unavailable;
+        assert!(!second.worsened_since(&first));
+        second.condition = Condition::Critical;
+        assert!(second.worsened_since(&first));
+    }
+
+    #[test]
+    fn saved_comparison_keeps_values_in_columns_and_hides_unchanged_by_default() {
+        let first = snapshot("01A", 1, Some("2"));
+        let second = snapshot("01A", 2, Some("8"));
+        let changed = second.comparison(&first, false);
+        assert_eq!(changed.len(), 1);
+        assert_eq!((&*changed[0].before, &*changed[0].after), ("2", "8"));
+        assert!(changed[0].warning);
+        let all = snapshot("01A", 3, None).comparison(&first, true);
+        assert!(all.iter().any(|row| row.before == "2" && row.after == "–" && !row.warning));
+        assert!(all.iter().any(|row| row.field == "Kondíció" && row.before == row.after));
+    }
+
+    #[test]
+    fn portable_measurement_matches_serial_and_capacity_even_with_different_model_labels() {
+        let mut first = snapshot("01A", 1, Some("2"));
+        first.drive.model = "USB adapter".into();
+        let bytes = first.portable().unwrap();
+        let second = snapshot("01A", 2, Some("8"));
+        let imported = Snapshot::from_portable(&bytes, &second).unwrap();
+        assert!(imported.drive == second.drive);
+        assert_eq!(imported.measured, 1);
+        assert!(Snapshot::from_portable(&bytes, &snapshot("OTHER", 2, None)).is_err());
+    }
+
+    #[test]
+    fn import_rejects_unsupported_versions_and_invalid_measurements() {
+        let current = snapshot("01A", 2, Some("8"));
+        let original = snapshot("01A", 1, Some("2"));
+        let original: serde_json::Value = serde_json::from_slice(&original.portable().unwrap()).unwrap();
+        let rejects = |file: &serde_json::Value| {
+            assert!(Snapshot::from_portable(&serde_json::to_vec(file).unwrap(), &current).is_err());
+        };
+        let mut file = original.clone();
+        file["version"] = 2.into();
+        rejects(&file);
+
+        let mut file = original.clone();
+        file["measurement"]["drive"]["size"] = 8192.into();
+        rejects(&file);
+
+        let mut file = original.clone();
+        file["measurement"]["remaining"] = 101.into();
+        rejects(&file);
+
+        let mut file = original;
+        file["measurement"]["values"]["NVMe médiahibák"] = "2\n3".into();
+        rejects(&file);
     }
 
     #[test]

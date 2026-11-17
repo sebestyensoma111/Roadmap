@@ -1,0 +1,46 @@
+name: Rust CI
+
+'on':
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Rust ${{ matrix.rust }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: ['1.75.0', stable]
+
+    steps:
+      - name: Checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Install desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-4-1 fonts-dejavu-core
+
+      - name: Install Rust toolchain
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.rust }}
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+
+      - name: Test desktop and terminal builds
+        env:
+          RUSTUP_TOOLCHAIN: ${{ matrix.rust }}
+        run: |
+          cargo test --locked --all-targets
+          cargo test --locked --all-targets --no-default-features
+
+      - name: Build release
+        env:
+          RUSTUP_TOOLCHAIN: ${{ matrix.rust }}
+        run: cargo build --locked --release

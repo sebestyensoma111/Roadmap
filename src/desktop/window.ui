@@ -105,25 +105,112 @@
                   </object>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="temperature">
-                    <property name="xalign">0</property>
-                    <property name="selectable">true</property>
-                    <style><class name="heading"/></style>
-                  </object>
-                </child>
-                <child>
                   <object class="GtkBox" id="health_panel">
                     <property name="orientation">vertical</property>
-                    <property name="spacing">5</property>
+                    <property name="spacing">8</property>
                     <property name="visible">false</property>
+                    <style><class name="roadmap-card"/></style>
                     <child>
-                      <object class="GtkLabel" id="health_condition">
+                      <object class="GtkBox">
+                        <property name="homogeneous">true</property>
+                        <property name="spacing">10</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">4</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="label">Kondíció</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="health_condition">
+                                <property name="xalign">0</property>
+                                <property name="wrap">true</property>
+                                <property name="selectable">true</property>
+                                <style><class name="heading"/></style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">4</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="label">Hőfok</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="temperature">
+                                <property name="xalign">0</property>
+                                <property name="wrap">true</property>
+                                <property name="selectable">true</property>
+                                <style><class name="heading"/></style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">4</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="label">Üzemóra</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="power_on_time">
+                                <property name="xalign">0</property>
+                                <property name="wrap">true</property>
+                                <property name="selectable">true</property>
+                                <style><class name="heading"/></style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">4</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="label">Írt adat</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="written">
+                                <property name="xalign">0</property>
+                                <property name="wrap">true</property>
+                                <property name="selectable">true</property>
+                                <style><class name="heading"/></style>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="health_reason">
+                        <property name="visible">false</property>
                         <property name="xalign">0</property>
                         <property name="wrap">true</property>
+                        <style><class name="roadmap-warning"/></style>
                       </object>
                     </child>
                     <child>
                       <object class="GtkLabel" id="health_endurance">
+                        <property name="visible">false</property>
                         <property name="xalign">0</property>
                         <property name="wrap">true</property>
                         <style><class name="dim-label"/></style>
@@ -131,34 +218,13 @@
                     </child>
                     <child>
                       <object class="GtkProgressBar" id="health_bar">
+                        <property name="visible">false</property>
                         <property name="halign">start</property>
                         <property name="width-request">240</property>
                         <style><class name="health-bar"/></style>
                         <accessibility>
-                          <property name="label">Becsült hátralévő élettartam</property>
+                          <property name="label">Állapot</property>
                         </accessibility>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="written">
-                        <property name="margin-top">4</property>
-                        <property name="xalign">0</property>
-                        <property name="wrap">true</property>
-                        <property name="selectable">true</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="read_total">
-                        <property name="xalign">0</property>
-                        <property name="wrap">true</property>
-                        <property name="selectable">true</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="power_on_time">
-                        <property name="xalign">0</property>
-                        <property name="wrap">true</property>
-                        <property name="selectable">true</property>
                       </object>
                     </child>
                   </object>
@@ -196,18 +262,13 @@
                   <object class="GtkBox">
                     <property name="spacing">8</property>
                     <child>
-                      <object class="GtkButton" id="snapshot">
-                        <property name="label">Pillanatkép mentése</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="export">
-                        <property name="label">Jelentés mentése…</property>
+                      <object class="GtkButton" id="export_sheet">
+                        <property name="label">Mérési lap mentése…</property>
                       </object>
                     </child>
                     <child>
                       <object class="GtkCheckButton" id="export_serial">
-                        <property name="label">Sorozatszám a jelentésben</property>
+                        <property name="label">Sorozatszám feltüntetése</property>
                       </object>
                     </child>
                   </object>
@@ -233,19 +294,98 @@
                     </child>
                     <child type="tab"><object class="GtkLabel"><property name="label">Összefoglaló</property></object></child>
                     <child>
-                      <object class="GtkScrolledWindow">
-                        <property name="hscrollbar-policy">never</property>
-                        <property name="child">
-                          <object class="GtkListBox" id="history_list">
-                            <property name="selection-mode">none</property>
-                            <property name="show-separators">true</property>
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="spacing">8</property>
+                            <property name="margin-top">12</property>
                             <property name="margin-start">12</property>
                             <property name="margin-end">12</property>
-                            <property name="margin-top">12</property>
-                            <property name="margin-bottom">12</property>
-                            <style><class name="boxed-list"/></style>
+                            <child>
+                              <object class="GtkButton" id="import_measurement">
+                                <property name="label">Mérés importálása…</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="export_measurement">
+                                <property name="label">Aktuális mérés exportálása…</property>
+                              </object>
+                            </child>
                           </object>
-                        </property>
+                        </child>
+                        <child>
+                          <object class="GtkDrawingArea" id="history_trend">
+                            <property name="content-height">150</property>
+                            <property name="margin-top">10</property>
+                            <property name="margin-start">12</property>
+                            <property name="margin-end">12</property>
+                            <property name="visible">false</property>
+                            <property name="has-tooltip">true</property>
+                            <property name="focusable">true</property>
+                            <accessibility><property name="label">Meghajtó állapotának alakulása</property></accessibility>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="history_trend_note">
+                            <property name="margin-top">5</property>
+                            <property name="margin-start">12</property>
+                            <property name="margin-end">12</property>
+                            <property name="xalign">0</property>
+                            <property name="wrap">true</property>
+                            <property name="visible">false</property>
+                            <style><class name="dim-label"/></style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="history_controls">
+                            <property name="orientation">vertical</property>
+                            <property name="margin-top">12</property>
+                            <property name="margin-start">12</property>
+                            <property name="margin-end">12</property>
+                            <property name="spacing">6</property>
+                            <property name="visible">false</property>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="spacing">8</property>
+                                <property name="homogeneous">true</property>
+                                <child><object class="GtkLabel"><property name="label">Mutató</property><property name="xalign">0</property></object></child>
+                                <child>
+                                  <object class="GtkComboBoxText" id="history_before">
+                                    <accessibility><property name="label">Bal oldali mérés</property></accessibility>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkComboBoxText" id="history_after">
+                                    <accessibility><property name="label">Jobb oldali mérés</property></accessibility>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="history_all">
+                                <property name="label">Minden érték</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkScrolledWindow">
+                            <property name="hscrollbar-policy">never</property>
+                            <property name="vexpand">true</property>
+                            <property name="child">
+                              <object class="GtkListBox" id="history_list">
+                                <property name="selection-mode">none</property>
+                                <property name="show-separators">true</property>
+                                <property name="margin-start">12</property>
+                                <property name="margin-end">12</property>
+                                <property name="margin-top">12</property>
+                                <property name="margin-bottom">12</property>
+                                <style><class name="boxed-list"/></style>
+                              </object>
+                            </property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child type="tab"><object class="GtkLabel"><property name="label">Előzmények</property></object></child>

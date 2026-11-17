@@ -3,6 +3,7 @@ use std::ffi::{c_char, c_int, c_uint, c_ulong, c_void};
 pub type Object = *mut c_void;
 pub type Callback = unsafe extern "C" fn();
 pub const FILE_CHOOSER_SAVE: c_int = 1;
+pub const FILE_CHOOSER_OPEN: c_int = 0;
 pub const RESPONSE_ACCEPT: c_int = -3;
 
 #[link(name = "libgtk-4.so.1", kind = "dylib", modifiers = "+verbatim")]
@@ -23,9 +24,14 @@ extern "C" {
     pub fn gtk_widget_get_parent(widget: Object) -> Object;
     pub fn gtk_widget_set_sensitive(widget: Object, sensitive: c_int);
     pub fn gtk_widget_set_visible(widget: Object, visible: c_int);
+    pub fn gtk_widget_queue_draw(widget: Object);
+    pub fn gtk_widget_get_width(widget: Object) -> c_int;
+    pub fn gtk_tooltip_set_text(tooltip: Object, text: *const c_char);
+    pub fn gtk_drawing_area_set_draw_func(area: Object,
+        draw: Option<unsafe extern "C" fn(Object, Object, c_int, c_int, Object)>, data: Object,
+        destroy: Option<unsafe extern "C" fn(Object)>);
     pub fn gtk_widget_set_hexpand(widget: Object, expand: c_int);
     pub fn gtk_widget_add_css_class(widget: Object, class: *const c_char);
-    pub fn gtk_widget_remove_css_class(widget: Object, class: *const c_char);
     pub fn gtk_widget_set_margin_start(widget: Object, margin: c_int);
     pub fn gtk_widget_set_margin_end(widget: Object, margin: c_int);
     pub fn gtk_widget_set_margin_top(widget: Object, margin: c_int);
@@ -46,6 +52,7 @@ extern "C" {
     pub fn gtk_list_box_row_set_activatable(row: Object, active: c_int);
     pub fn gtk_spinner_set_spinning(spinner: Object, spinning: c_int);
     pub fn gtk_combo_box_text_append_text(combo: Object, text: *const c_char);
+    pub fn gtk_combo_box_text_remove_all(combo: Object);
     pub fn gtk_combo_box_set_active(combo: Object, index: c_int);
     pub fn gtk_combo_box_get_active(combo: Object) -> c_int;
     pub fn gtk_notebook_set_current_page(notebook: Object, index: c_int);
@@ -63,6 +70,7 @@ extern "C" {
     pub fn gtk_text_buffer_set_text(buffer: Object, text: *const c_char, len: c_int);
     pub fn gtk_box_new(orientation: c_int, spacing: c_int) -> Object;
     pub fn gtk_box_append(container: Object, child: Object);
+    pub fn gtk_box_set_homogeneous(container: Object, homogeneous: c_int);
 }
 
 #[link(name = "libgio-2.0.so.0", kind = "dylib", modifiers = "+verbatim")]
